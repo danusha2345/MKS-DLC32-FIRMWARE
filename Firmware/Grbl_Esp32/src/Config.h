@@ -93,8 +93,8 @@ const int MAX_N_AXIS = 6;
 #define BAUD_RATE 115200
 
 //Connect to your local AP with these credentials
-//#define CONNECT_TO_SSID  "your SSID"
-//#define SSID_PASSWORD  "your SSID password"
+#define CONNECT_TO_SSID  "kv-41"
+#define SSID_PASSWORD  "21302130"
 //CONFIGURE_EYECATCH_BEGIN (DO NOT MODIFY THIS LINE)
 // #define ENABLE_BLUETOOTH  // enable bluetooth
 
@@ -107,17 +107,18 @@ const int MAX_N_AXIS = 6;
 #endif
 
 #define ENABLE_HTTP                     /* enable HTTP and all related services              */                   
-#define ENABLE_OTA                   /* enable OTA                                        */
+#define ENABLE_OTA                      /* enable OTA                                        */
 #define ENABLE_TELNET                   /* enable telnet                                     */
 #define ENABLE_TELNET_WELCOME_MSG       /* display welcome string when connect to telnet     */                           
-// #define ENABLE_MDNS                  /* enable mDNS discovery                             */   
+#define ENABLE_MDNS                     /* enable mDNS discovery                             */   
 // #define ENABLE_SSDP                  /* enable UPNP discovery                             */   
 // #define ENABLE_NOTIFICATIONS         /* enable notifications                              */   
+
+//#define ENABLE_ESPNOW_SERIAL
 
 #define ENABLE_SERIAL2SOCKET_IN
 #define ENABLE_SERIAL2SOCKET_OUT
 
-#define USE_UART_I2C_PINS
 // Captive portal is used when WiFi is in access point mode.  It lets the
 // WebUI come up automatically in the browser, instead of requiring the user
 // to browse manually to a default URL.  It works like airport and hotel

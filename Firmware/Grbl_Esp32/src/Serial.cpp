@@ -56,6 +56,10 @@
 */
 
 #include "Grbl.h"
+
+#ifdef ENABLE_ESPNOW_SERIAL
+    #include "ESPNowSerial.h"
+#endif
 // #include "mks/lcd_serial.h"
 
 // Define this to use the Arduino serial (UART) driver instead
@@ -121,6 +125,8 @@ void client_init() {
     Uart0.write("\n");  // create some white space after ESP32 boot info
 #endif
     clientCheckTaskHandle = 0;
+
+
     // create a task to check for incoming data
     // For a 4096-word stack, uxTaskGetStackHighWaterMark reports 244 words available
     // after WebUI attaches.
@@ -158,6 +164,15 @@ static uint8_t getClientChar(uint8_t* data) {
         }
     }
 #endif
+
+#ifdef ENABLE_ESPNOW_SERIAL
+    if((res = ESPNowSerial::read()) != -1)
+    {
+        *data = res;
+        return CLIENT_SERIAL;
+    }
+#endif
+
 #if defined(ENABLE_WIFI) && defined(ENABLE_HTTP) && defined(ENABLE_SERIAL2SOCKET_IN)
     if (WebUI::Serial2Socket.available()) {
         *data = WebUI::Serial2Socket.read();
@@ -364,6 +379,12 @@ void client_write(uint8_t client, const char* text) {
     if (WebUI::SerialBT.hasClient() && (client == CLIENT_BT || client == CLIENT_ALL)) {
         WebUI::SerialBT.print(text);
         //delay(10); // possible fix for dropped characters
+    }
+#endif
+#ifdef ENABLE_ESPNOW_SERIAL
+    if(client == CLIENT_SERIAL || client == CLIENT_ALL)
+    {
+        ESPNowSerial::write((const uint8_t*)text, strlen(text));
     }
 #endif
 #if defined(ENABLE_WIFI) && defined(ENABLE_HTTP) && defined(ENABLE_SERIAL2SOCKET_OUT)
