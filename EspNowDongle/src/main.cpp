@@ -14,6 +14,10 @@
   #define ESP_NOW_DEVICE_PEER_ID 55
 #endif
 
+using namespace EspNow;
+
+Peer peer(ESP_NOW_DEVICE_PEER_ID);
+
 void setup() 
 {
   //Serial.setPins(23, 22);
@@ -25,14 +29,18 @@ void setup()
 
   Serial.println("Start");
 
-  EspNowDevice::set_log_callback([](const char* data) -> void
+  Device::set_log_callback([](const char* data) -> void
   {
     Serial.print(data);
   });
 
-  EspNowDevice::setup(ESP_NOW_DEVICE_ID);
+  delay(2000);
 
-  EspNowDevice::add_peer(ESP_NOW_DEVICE_PEER_ID);
+  Device::setup(ESP_NOW_DEVICE_ID);
+
+  delay(500);
+
+  Device::add_peer(&peer);
 
  // ESPNowSerial::setup([](const char* msg) -> void
   //{
@@ -44,7 +52,7 @@ void setup()
   #endif
 
   #ifdef IS_TEST_SERVER
-    EspNowDevice::try_connect(ESP_NOW_DEVICE_PEER_ID, INT32_MAX, true);
+    peer.try_connect(INT32_MAX, true);
   #endif
 }
 
@@ -58,36 +66,40 @@ void loop()
 
   static uint32_t last_send_ms = 0;
 
-  //while((byte_val = ESPNowSerial::read()) != -1)
+  size_t readed;
+
+  if((readed = (peer.receive(buffer, sizeof(buffer), 0))) > 0)
   {
-    //Serial.write(byte_val);
+    Serial.write(buffer, readed);
   }
 
   while((avail = Serial.available()) > 0)
   {
     auto read_size = Serial.readBytes(buffer, avail > sizeof(buffer) ? sizeof(buffer) : avail);
 
-    //ESPNowSerial::write(buffer, read_size);
+    peer.send(buffer, read_size, 0);
   }
 
-  if((millis() - last_send_ms) > 100 && 0)
+  if((millis() - last_send_ms) > 500)
   {
-    /*
+    
     #ifdef IS_TEST_SERVER
       char buff[32];
       sprintf(buff, "server %i\n", loop_index++);
-      ESPNowSerial::write((uint8_t*)buff, strlen(buff));
+      peer.send((uint8_t*)buff, strlen(buff), 0);
     #endif
-    */
+    
 
     #ifdef IS_TEST_CLIENT
       char buff[32];
       sprintf(buff, "client %i\n", loop_index++);
-      //ESPNowSerial::write((uint8_t*)buff, strlen(buff));
+      peer.send((uint8_t*)buff, strlen(buff), 0);
     #endif
 
     last_send_ms = millis();
+
+    Serial.printf("ping %i\n", (int)peer.get_avg_ping());
   }
 
-  delayMicroseconds(100);
+  delay(300);
 }
