@@ -13,8 +13,9 @@ namespace EspNow
 
   TaskHandle_t main_task = NULL;
   RingbufHandle_t rx_packet_buf = NULL;
-  RingbufHandle_t tx_packet_buf = NULL;
   QueueSetHandle_t rx_tx_queue_set = NULL;
+
+  SemaphoreHandle_t rx_packet_buf_semaphore;
 
   int32_t current_wifi_channel = 0;
 
@@ -23,12 +24,11 @@ namespace EspNow
   esp_now_peer_info_t peer_info = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, {}, 0, wifi_interface_t::WIFI_IF_STA, false};
 
   const packet_id_t FIRST_PACKET_ID = 1U;
-  const packet_id_t HANSHAKE_PACKET_ID = UINT8_MAX;
-  
+  const packet_id_t HANDSHAKE_PACKET_ID = UINT16_MAX;
 
   inline packet_id_t get_next_packet_id(packet_id_t id)
   {
-    if(id == (UINT8_MAX - 1U))
+    if(id == (UINT16_MAX - 1U))
       return FIRST_PACKET_ID;
     
     return ++id;
@@ -48,7 +48,7 @@ namespace EspNow
 
     #define ESPNOW_SERIAL_ASSERT(...)
 
-      #define ESPNOW_SERIAL_ASSERT(ret_value, cond) \
+    #define ESPNOW_SERIAL_ASSERT(ret_value, cond) \
       if (!(cond)) { \
         if(log_func) { snprintf(_log_buffer, sizeof(_log_buffer), "%s %s:%i", #cond, __FILE__, __LINE__); \
         log_func(_log_buffer); } \
@@ -63,7 +63,14 @@ namespace EspNow
     #define ESPNOW_SERIAL_LOG_ERROR(...) \
         if(log_func) { snprintf(_log_buffer, sizeof(_log_buffer), __VA_ARGS__); log_func(_log_buffer); }
 
-    #define ESPNOW_SERIAL_ASSERT(ret_value, cond) if (!(cond)) return (ret_value);
+    #define ESPNOW_SERIAL_ASSERT(ret_value, cond) \
+      if (!(cond)) { \
+        if(log_func) { snprintf(_log_buffer, sizeof(_log_buffer), "%s %s:%i", #cond, __FILE__, __LINE__); \
+        log_func(_log_buffer); } \
+      return ret_value; }
+
+    #define ESPNOW_SERIAL_LOG_IMPORTANT(...) \
+        if(log_func) { snprintf(_log_buffer, sizeof(_log_buffer), __VA_ARGS__); log_func(_log_buffer); }
 
   #endif
 
@@ -121,32 +128,6 @@ namespace EspNow
 
   Packet new_packet;
 
-  void send_packet_loop(void*)
-  {
-    for(;;)
-    {
-      size_t size;
-
-      auto data = xRingbufferReceive(tx_packet_buf, &size, portMAX_DELAY);
-
-      if(data)
-      {
-        ESPNOW_SERIAL_ASSERT(void(), esp_now_send(peer_info.peer_addr, (uint8_t*)data, size) == ESP_OK);
-
-        uint32_t ulNotifiedValue = 0;
-
-        auto res = xTaskNotifyWait(0x00, 0x1 | 0x2, &ulNotifiedValue, pdMS_TO_TICKS(5));
-
-        if(ulNotifiedValue & 0x2)
-        {
-            ESPNOW_SERIAL_LOG("esp_now_send error\n");
-        }
-
-        vRingbufferReturnItem(tx_packet_buf, data);
-      }
-    }
-  }
-
   void send_packet(Packet::Type type, peer_id_t to_peer, Packet* packet)
   {
       packet->header.magic_num = ESP_NOW_DEVICE_MAGIC_CONST;
@@ -156,34 +137,30 @@ namespace EspNow
       packet->header.from_peer = current_peer_id;
       packet->header.wifi_channel = current_wifi_channel;
 
-      ESPNOW_SERIAL_ASSERT(void(), esp_now_send(peer_info.peer_addr, (uint8_t*)packet, packet->get_size()) == ESP_OK);
+      ESPNOW_SERIAL_LOG_IMPORTANT("send packet type=%i peer_id=%i\n", (int)type, (int)to_peer);
 
-      return;
-      uint32_t ulNotifiedValue = 0;
+      auto send_res = esp_now_send(peer_info.peer_addr, (uint8_t*)packet, packet->get_size());
 
-      auto res = xTaskNotifyWait(0x00, 0x1 | 0x2, &ulNotifiedValue, pdMS_TO_TICKS(10));
-
-      if(ulNotifiedValue & 0x2)
+      if(send_res != ESP_OK)
       {
-          ESPNOW_SERIAL_LOG("esp_now_send error\n");
+        ESPNOW_SERIAL_LOG_IMPORTANT("esp_now_send err=%i\n", (int)send_res);
       }
-      /*
-      ESPNOW_SERIAL_LOG("send packet type=%i peer_id=%i\n", (int)type, (int)to_peer);
-      
-      ESPNOW_SERIAL_ASSERT(void(), esp_now_send(peer_info.peer_addr, (uint8_t*)packet, packet->get_size()) == ESP_OK);
 
       uint32_t ulNotifiedValue = 0;
 
-      auto res = xTaskNotifyWait(0x00, 0x1 | 0x2, &ulNotifiedValue, pdMS_TO_TICKS(1));
+      //auto res = xTaskNotifyWait(0x00, 0x1 | 0x2, &ulNotifiedValue, pdMS_TO_TICKS(10));
 
-      if(ulNotifiedValue & 0x2)
+      //if(res != pdPASS || ulNotifiedValue & 0x2)
       {
-          ESPNOW_SERIAL_LOG("esp_now_send error\n");
-      }*/
+          //ESPNOW_SERIAL_LOG_IMPORTANT("esp_now_send error\n");
+      }
   }
 
   inline BaseType_t xRingbufferSendOverride(RingbufHandle_t xRingbuffer,const void *pvItem, size_t xItemSize, TickType_t xTicksToWait)
   {
+    return xRingbufferSend(xRingbuffer, pvItem, xItemSize, xTicksToWait);
+
+    /*
     size_t free_size;
 
     if((free_size = xRingbufferGetCurFreeSize(xRingbuffer)) < xItemSize)
@@ -193,7 +170,7 @@ namespace EspNow
       vRingbufferReturnItem(xRingbuffer, data);
     }
 
-    return xRingbufferSend(xRingbuffer, pvItem, xItemSize, xTicksToWait);
+    return xRingbufferSend(xRingbuffer, pvItem, xItemSize, xTicksToWait);*/
   }
 
   void Peer::_initialize()
@@ -204,7 +181,7 @@ namespace EspNow
             ESPNOW_SERIAL_ASSERT(void(), _receive_buffer = xRingbufferCreate(_receive_buffer_size, RINGBUF_TYPE_BYTEBUF));
        
           ESPNOW_SERIAL_ASSERT(void(), _send_buffer = xRingbufferCreate(_send_buffer_size, RINGBUF_TYPE_BYTEBUF));
-          ESPNOW_SERIAL_ASSERT(void(), xRingbufferAddToQueueSetRead(_send_buffer, rx_tx_queue_set) == pdTRUE);
+          //ESPNOW_SERIAL_ASSERT(void(), xRingbufferAddToQueueSetRead(_send_buffer, rx_tx_queue_set) == pdTRUE);
 
           _data.sended_id = FIRST_PACKET_ID;
           _data.received_id = FIRST_PACKET_ID;
@@ -217,12 +194,29 @@ namespace EspNow
 
   void Peer::_on_connect()
   {
-    //if(!_connected)
+    if(1)
     {
       _connected = true;
 
       _data.sended_id = FIRST_PACKET_ID;
       _data.received_id = FIRST_PACKET_ID;
+
+      _data.send_time = 0;
+
+      size_t size;
+      void* data;
+
+      while(data = xRingbufferReceiveUpTo(_send_buffer, &size, 0, _send_buffer_size))
+      {
+        if(data)
+          vRingbufferReturnItem(_send_buffer, data);
+      }
+
+      while(data = xRingbufferReceiveUpTo(_receive_buffer, &size, 0, _send_buffer_size))
+      {
+        if(data)
+          vRingbufferReturnItem(_receive_buffer, data);
+      }
     }
   }
 
@@ -234,7 +228,6 @@ namespace EspNow
     memcpy(new_packet.data.data, _data.data, _data.length);
 
     send_packet(Packet::Data, _peer_id, &new_packet);
-    
 
     _data.send_time = micros();
   }
@@ -278,7 +271,7 @@ namespace EspNow
         }
         else
         {
-          xRingbufferSend(_receive_buffer, packet->data.data, packet->data.length, 0);
+          xRingbufferSendOverride(_receive_buffer, packet->data.data, packet->data.length, 0);
         }
 
         new_packet.data_responce.packet_id = packet->data.packet_id;
@@ -286,23 +279,17 @@ namespace EspNow
     }
     else
     {
-      static uint32_t last_responced_id = 0;
-      static uint64_t last_responced_at = 0;
-      
-      if(micros() - last_responced_at > 6000)
-      {
-        last_responced_id = packet->data.packet_id;
+      ESPNOW_SERIAL_LOG_ERROR("packet mistmatch\n");
 
-        new_packet.data_responce.packet_id = packet->data.packet_id;
-        send_packet(Packet::DataResponce, _peer_id, &new_packet);
-
-        last_responced_at = micros();
-      }
+      new_packet.data_responce.packet_id = packet->data.packet_id;
+      send_packet(Packet::DataResponce, _peer_id, &new_packet);
     }
   }
 
   void Peer::_on_responce_packet(Packet* packet)
   {
+    ESPNOW_SERIAL_LOG_ERROR("resp %i\n", (int)packet->data_responce.packet_id);
+
     if(_data.sended_id == packet->data_responce.packet_id)
     {
       auto ping = (micros() - _data.begin_send_time);
@@ -320,22 +307,24 @@ namespace EspNow
 
       _data.send_time = 0;
 
-      _send_data_if_need();
+      //_send_data_if_need();
     }
   }
 
   bool Peer::_on_packet_begin(Packet* packet)
   {
-    if(packet->header.type == Packet::Data && packet->data.packet_id == HANSHAKE_PACKET_ID)
+    if(packet->header.type == Packet::Data && packet->data.packet_id == HANDSHAKE_PACKET_ID)
     {
       _on_connect();
 
-      new_packet.data_responce.packet_id = HANSHAKE_PACKET_ID;
+      new_packet.data_responce.packet_id = HANDSHAKE_PACKET_ID;
       send_packet(Packet::DataResponce, _peer_id, &new_packet);
+
+      ESPNOW_SERIAL_LOG_IMPORTANT("on handshake %i", current_wifi_channel);
 
       return false;
     }
-    else if(packet->header.type == Packet::DataResponce && packet->data_responce.packet_id == HANSHAKE_PACKET_ID)
+    else if(packet->header.type == Packet::DataResponce && packet->data_responce.packet_id == HANDSHAKE_PACKET_ID)
     {
       _on_connect();
 
@@ -343,6 +332,8 @@ namespace EspNow
       {
         xSemaphoreGive(_handshake_semaphore);
         _wifi_channel = current_wifi_channel;
+
+        ESPNOW_SERIAL_LOG_IMPORTANT("on handshake %i", current_wifi_channel);
 
         ESPNOW_SERIAL_LOG("xSemaphoreGive peer_id=%i\n", (int)peer_id);
       }
@@ -367,7 +358,7 @@ namespace EspNow
 
         _data.resended_count++;
 
-        ESPNOW_SERIAL_LOG_ERROR("resend\n");
+        ESPNOW_SERIAL_LOG_ERROR("packet resend\n");
       }
     }
     else
@@ -405,11 +396,11 @@ namespace EspNow
 
                   current_wifi_channel = i;
 
-                  delay(30);
+                  delay(15);
 
                   new_packet.data.length = 0;
 
-                  new_packet.data.packet_id = HANSHAKE_PACKET_ID;
+                  new_packet.data.packet_id = HANDSHAKE_PACKET_ID;
 
                   send_packet(Packet::Data, _peer_id, &new_packet);
 
@@ -423,7 +414,7 @@ namespace EspNow
           {
             new_packet.data.length = 0;
 
-            new_packet.data.packet_id = HANSHAKE_PACKET_ID;
+            new_packet.data.packet_id = HANDSHAKE_PACKET_ID;
 
             send_packet(Packet::Data, _peer_id, &new_packet);
             
@@ -436,6 +427,8 @@ namespace EspNow
           if(_wifi_channel)
           {
             current_wifi_channel = _wifi_channel;
+
+            ESPNOW_SERIAL_LOG_IMPORTANT("Found channel=%i", (int)_wifi_channel);
 
             break;
           }
@@ -474,33 +467,40 @@ namespace EspNow
   {
       auto packet = (Packet*)data;
 
-      if(0 && peer_info.peer_addr[0] == 0xFF && peer_info.peer_addr[1] == 0xFF)
-      {
-        memcpy(peer_info.peer_addr, mac_addr, sizeof(peer_info.peer_addr));
-
-        esp_now_add_peer(&peer_info);
-      }
+      ESPNOW_SERIAL_LOG_IMPORTANT("new packet\n");
 
       if(packet->validate(len))
       {
         if(packet->header.to_peer == current_peer_id)
         {
-            ESPNOW_SERIAL_LOG("new packet type=%i\n", (int)packet->header.type);
-          
-            if(xRingbufferSend(rx_packet_buf, data, len, 0) != pdTRUE)
+            ESPNOW_SERIAL_LOG_IMPORTANT("new packet type=%i %i\n", (int)packet->header.type, (int)len);
+
+            if(xSemaphoreTake(rx_packet_buf_semaphore, 0) == pdTRUE)
             {
-              ESPNOW_SERIAL_LOG_ERROR("pack send err %i %i\n", xRingbufferGetCurFreeSize(rx_packet_buf), len);
+              if(xRingbufferSend(rx_packet_buf, data, len, 0) == pdTRUE)
+              {
+              }
+              else
+              {
+                ESPNOW_SERIAL_LOG_IMPORTANT("rx_packet_buf err\n");
+              }
+
+              xSemaphoreGive(rx_packet_buf_semaphore);
             }
+            else
+              {
+                ESPNOW_SERIAL_LOG_IMPORTANT("sem take err\n");
+              }
         }
         else
         {
-          ESPNOW_SERIAL_LOG("invalid packet, to_peer=%i, type=%i, this_peer=%i\n", 
+          ESPNOW_SERIAL_LOG_IMPORTANT("invalid packet, to_peer=%i, type=%i, this_peer=%i\n", 
             (int)packet->header.to_peer, (int)packet->header.type, (int)current_peer_id);
         }
       }
       else
       {
-        ESPNOW_SERIAL_LOG("invalid packet, size=%i\n", (int)len);
+        ESPNOW_SERIAL_LOG_IMPORTANT("invalid packet, size=%i\n", (int)len);
       }
   }
 
@@ -508,17 +508,18 @@ namespace EspNow
   {
     ESPNOW_SERIAL_ASSERT(false, esp_now_init() == ESP_OK);
 
-    ESPNOW_SERIAL_ASSERT(false, rx_packet_buf = xRingbufferCreate(sizeof(Packet) * 3, RINGBUF_TYPE_ALLOWSPLIT));
-    //ESPNOW_SERIAL_ASSERT(false, tx_packet_buf = xRingbufferCreate(sizeof(Packet) * 3, RINGBUF_TYPE_NOSPLIT));
+    ESPNOW_SERIAL_ASSERT(false, rx_packet_buf = xRingbufferCreate(sizeof(Packet) * 3, RINGBUF_TYPE_NOSPLIT));
 
-    ESPNOW_SERIAL_ASSERT(false, rx_tx_queue_set = xQueueCreateSet(ESP_NOW_DEVICE_MAX_PEERS * 3));
+    //ESPNOW_SERIAL_ASSERT(false, rx_tx_queue_set = xQueueCreateSet(ESP_NOW_DEVICE_MAX_PEERS * 3));
 
-    ESPNOW_SERIAL_ASSERT(false, xRingbufferAddToQueueSetRead(rx_packet_buf, rx_tx_queue_set) == pdTRUE);
+    //ESPNOW_SERIAL_ASSERT(false, xRingbufferAddToQueueSetRead(rx_packet_buf, rx_tx_queue_set) == pdTRUE);
 
     ESPNOW_SERIAL_ASSERT(false, esp_now_add_peer(&peer_info) == ESP_OK);
 
     ESPNOW_SERIAL_ASSERT(false, esp_now_register_send_cb(EspNowOnDataSent) == ESP_OK);
     ESPNOW_SERIAL_ASSERT(false, esp_now_register_recv_cb(EspNowOnDataRecv) == ESP_OK);
+
+    rx_packet_buf_semaphore = xSemaphoreCreateMutex();
 
     current_wifi_channel = WiFi.channel();
 
@@ -543,64 +544,65 @@ namespace EspNow
   void main_task_loop(void*)
   {
       size_t size;
-      Packet packet;
+      Packet input;
 
       while(true)
       {
-          auto member = xQueueSelectFromSet(rx_tx_queue_set, pdMS_TO_TICKS(3));
+         // auto member = xQueueSelectFromSet(rx_tx_queue_set, pdMS_TO_TICKS(3));
+            //has_unsend_data() ? pdMS_TO_TICKS(3) : portMAX_DELAY);
 
-          //Packet* packet_data;
+          vTaskDelay(pdMS_TO_TICKS(1));
 
-          size_t item_size1, item_size2;
-          uint8_t *item1 = NULL, *item2 = NULL;
-
-          while(xRingbufferReceiveSplit(rx_packet_buf, (void **)&item1, (void **)&item2, &item_size1, &item_size2, 0) == pdTRUE && item1)
+          if(xSemaphoreTake(rx_packet_buf_semaphore, 0) == pdTRUE)
           {
-            uint8_t* packet_ptr = (uint8_t*)&packet;
+            auto packet = (Packet*)xRingbufferReceive(rx_packet_buf, &size, 0);
 
-            memcpy(packet_ptr, item1, item_size1);
-
-            vRingbufferReturnItem(rx_packet_buf, item1);
-
-            if(item2)
+            if(packet)
             {
-              memcpy(packet_ptr + item_size1, item2, item_size2);
+              memcpy(&input, packet, size);
 
-              vRingbufferReturnItem(rx_packet_buf, item2);
-            }
+              vRingbufferReturnItem(rx_packet_buf, packet);
 
-            Peer* peer = find_peer(packet.header.from_peer);
+              xSemaphoreGive(rx_packet_buf_semaphore);
 
-            ESPNOW_SERIAL_LOG("process packet type=%i peer=%i, found: %s\n", 
-              (int)packet.header.type, (int)packet.header.from_peer,
-                peer ? "true" : "false");
-            
-            if(peer)
-            {
-              if(peer->_on_packet_begin(&packet))
+              Peer* peer = find_peer(input.header.from_peer);
+
+              ESPNOW_SERIAL_LOG("process packet type=%i peer=%i, found: %s\n", 
+                (int)input.header.type, (int)input.header.from_peer,
+                  peer ? "true" : "false");
+              
+              if(peer)
               {
-                switch(packet.header.type)
+                if(peer->_on_packet_begin(&input))
                 {
-                    case Packet::Data:
-                        peer->_on_data_packet(&packet);
-                        break;
+                  switch(input.header.type)
+                  {
+                      case Packet::Data:
+                          peer->_on_data_packet(&input);
+                          break;
 
-                    case Packet::DataResponce:
-                        peer->_on_responce_packet(&packet);
-                        break;
+                      case Packet::DataResponce:
+                          peer->_on_responce_packet(&input);
+                          break;
+                  }
                 }
               }
             }
-          }
-          
-          for(auto i = 0; i < used_peers; i++)
-          {
-              auto peer = peers[i];
+            else
+            {
+              xSemaphoreGive(rx_packet_buf_semaphore);
+            }
 
-              if(peer->is_connected())
-              {
-                  peer->_update();
-              }
+            for(auto i = 0; i < used_peers; i++)
+            {
+                auto peer = peers[i];
+
+                if(peer->is_connected())
+                {
+                    peer->_update();
+                }
+            }
+
           }
       }
   }
@@ -630,9 +632,8 @@ namespace EspNow
       if(!setup_internal())
         return false;
 
-      ESPNOW_SERIAL_ASSERT(false, xTaskCreatePinnedToCore(main_task_loop, "espnow1", 5000, NULL, 3, &main_task, 0) == pdPASS);
-      //ESPNOW_SERIAL_ASSERT(false, xTaskCreatePinnedToCore(send_packet_loop, "espnow_2", 5000, NULL, 3, NULL, 0) == pdPASS);
-
+      ESPNOW_SERIAL_ASSERT(false, xTaskCreatePinnedToCore(main_task_loop, "espnow", 4096, NULL, 0, &main_task, 0) == pdPASS);
+ 
       ESPNOW_SERIAL_LOG("ESPNowSerialCommon ch=%i\n", WiFi.channel());
 
       return true;
@@ -653,10 +654,7 @@ namespace EspNow
   {
     if(is_connected())
     {
-      if(xRingbufferSend(_send_buffer, data, length, mills_to_tics(wait_ms)) == pdTRUE)
-        return true;
-      
-      ESPNOW_SERIAL_LOG_ERROR("data drop %i\n", (int)length);
+      return xRingbufferSendOverride(_send_buffer, data, length, mills_to_tics(wait_ms)) == pdTRUE;
     }
     else
     {

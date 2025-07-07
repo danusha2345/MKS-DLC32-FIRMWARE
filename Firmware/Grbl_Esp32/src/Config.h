@@ -114,7 +114,7 @@ const int MAX_N_AXIS = 6;
 // #define ENABLE_SSDP                  /* enable UPNP discovery                             */   
 // #define ENABLE_NOTIFICATIONS         /* enable notifications                              */   
 
-//#define ENABLE_ESPNOW_SERIAL
+#define ENABLE_ESPNOW_SERIAL
 
 #define ENABLE_SERIAL2SOCKET_IN
 #define ENABLE_SERIAL2SOCKET_OUT

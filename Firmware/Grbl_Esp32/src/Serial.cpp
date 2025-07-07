@@ -59,6 +59,8 @@
 
 #ifdef ENABLE_ESPNOW_SERIAL
     #include "ESPNowSerial.h"
+    bool ESPNowSerial::setup_done = false;
+    EspNow::Peer ESPNowSerial::peer(ESP_NOW_SERIAL_DONGLE_PEER_ID);
 #endif
 // #include "mks/lcd_serial.h"
 
@@ -384,7 +386,7 @@ void client_write(uint8_t client, const char* text) {
 #ifdef ENABLE_ESPNOW_SERIAL
     if(client == CLIENT_SERIAL || client == CLIENT_ALL)
     {
-        ESPNowSerial::write((const uint8_t*)text, strlen(text));
+        ESPNowSerial::write((uint8_t*)text, strlen(text));
     }
 #endif
 #if defined(ENABLE_WIFI) && defined(ENABLE_HTTP) && defined(ENABLE_SERIAL2SOCKET_OUT)

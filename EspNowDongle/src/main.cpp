@@ -16,16 +16,40 @@
 
 using namespace EspNow;
 
-Peer peer(ESP_NOW_DEVICE_PEER_ID);
+#define ESP_NOW_SERIAL_CURRENT_PEER_ID 0x41
+#define ESP_NOW_SERIAL_MKSDLC32_PEER_ID 0x42
+
+Peer peer(ESP_NOW_SERIAL_MKSDLC32_PEER_ID);
+
+void on_receive()
+{
+  int avail;
+  uint8_t buffer[sizeof(Packet::data.data)];
+
+  if((avail = Serial1.available()) > 0)
+  {
+    auto read_size = Serial1.readBytes(buffer, avail > sizeof(buffer) ? sizeof(buffer) : avail);
+
+    peer.send(buffer, read_size, 3);
+  }
+}
 
 void setup() 
 {
-  //Serial.setPins(23, 22);
+  Serial1.setPins(23, 22);
+  Serial1.begin(115200);
+
   Serial.begin(115200);
 
-  delay(1000);
+  //delay(1000);
 
   WiFi.mode(WIFI_AP_STA);
+
+  //WiFi.begin("kv-41", "21302130");
+
+  delay(2000);
+
+  WiFi.setSleep(false);
 
   Serial.println("Start");
 
@@ -34,13 +58,13 @@ void setup()
     Serial.print(data);
   });
 
-  delay(2000);
+  Device::setup(ESP_NOW_SERIAL_CURRENT_PEER_ID);
 
-  Device::setup(ESP_NOW_DEVICE_ID);
-
-  delay(500);
+  delay(10);
 
   Device::add_peer(&peer);
+
+  Serial1.onReceive(on_receive);
 
  // ESPNowSerial::setup([](const char* msg) -> void
   //{
@@ -52,7 +76,10 @@ void setup()
   #endif
 
   #ifdef IS_TEST_SERVER
-    peer.try_connect(INT32_MAX, true);
+    if(peer.try_connect(INT32_MAX, true))
+      Serial.printf("Connected\n");
+      else
+      Serial.printf("Fail\n");
   #endif
 }
 
@@ -62,27 +89,21 @@ void loop()
 {
   int avail = 0;
   int byte_val = 0;
-  uint8_t buffer[256];
+  uint8_t buffer[sizeof(Packet::data.data)];
 
   static uint32_t last_send_ms = 0;
 
   size_t readed;
 
-  if((readed = (peer.receive(buffer, sizeof(buffer), 0))) > 0)
+  if((readed = (peer.receive(buffer, sizeof(buffer), 1000))) > 0)
   {
-    Serial.write(buffer, readed);
+    Serial1.write(buffer, readed);
   }
 
-  while((avail = Serial.available()) > 0)
-  {
-    auto read_size = Serial.readBytes(buffer, avail > sizeof(buffer) ? sizeof(buffer) : avail);
-
-    peer.send(buffer, read_size, 0);
-  }
-
+  
   if((millis() - last_send_ms) > 500)
   {
-    
+    /*
     #ifdef IS_TEST_SERVER
       char buff[32];
       sprintf(buff, "server %i\n", loop_index++);
@@ -97,9 +118,8 @@ void loop()
     #endif
 
     last_send_ms = millis();
-
+    */
+   
     Serial.printf("ping %i\n", (int)peer.get_avg_ping());
   }
-
-  delay(300);
 }

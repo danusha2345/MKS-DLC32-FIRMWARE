@@ -22,7 +22,7 @@
 
 #ifdef ENABLE_ESPNOW_SERIAL
     #include "../ESPNowSerial.h"
-    #include "../../ESPNowSerialCommon.cpp"
+    #include "../../esp_now_device/Device.cpp"
 #endif 
 #ifdef ENABLE_WIFI
 
@@ -124,10 +124,12 @@ namespace WebUI {
         notificationsservice.begin();
 #    endif
 #    ifdef ENABLE_ESPNOW_SERIAL
-        ESPNowSerial::setup([](const char* msg) -> void
+        ESPNowSerial::set_log_callback([](const char* msg) -> void
         {
             Uart0.print(msg);
         });
+
+        ESPNowSerial::setup();
 #    endif
         //be sure we are not is mixed mode in setup
         WiFi.scanNetworks(true);
