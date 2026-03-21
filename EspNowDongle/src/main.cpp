@@ -26,9 +26,9 @@ void on_receive()
   int avail;
   uint8_t buffer[sizeof(Packet::data.data)];
 
-  if((avail = Serial1.available()) > 0)
+  if((avail = Serial.available()) > 0)
   {
-    auto read_size = Serial1.readBytes(buffer, avail > sizeof(buffer) ? sizeof(buffer) : avail);
+    auto read_size = Serial.readBytes(buffer, avail > sizeof(buffer) ? sizeof(buffer) : avail);
 
     peer.send(buffer, read_size, 3);
   }
@@ -36,14 +36,21 @@ void on_receive()
 
 void setup() 
 {
-  Serial1.setPins(23, 22);
-  Serial1.begin(115200);
+  //Serial1.setPins(23, 22);
+  //Serial1.begin(115200);
 
   Serial.begin(115200);
 
   //delay(1000);
 
-  WiFi.mode(WIFI_AP_STA);
+  (esp_wifi_set_mode(WIFI_MODE_STA));
+
+(esp_wifi_start());
+
+(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
+
+  //WiFi.setSleep(true);
+  return;
 
   //WiFi.begin("kv-41", "21302130");
 
@@ -55,7 +62,7 @@ void setup()
 
   Device::set_log_callback([](const char* data) -> void
   {
-    Serial.print(data);
+    //Serial.print(data);
   });
 
   Device::setup(ESP_NOW_SERIAL_CURRENT_PEER_ID);
@@ -64,7 +71,7 @@ void setup()
 
   Device::add_peer(&peer);
 
-  Serial1.onReceive(on_receive);
+  //Serial.onReceive(on_receive);
 
  // ESPNowSerial::setup([](const char* msg) -> void
   //{
@@ -72,7 +79,10 @@ void setup()
  // });
 
   #ifdef IS_TEST_CLIENT
-    //ESPNowSerial::try_find_device_channel();
+   if(peer.try_connect(INT32_MAX, true))
+      Serial.printf("Connected\n");
+      else
+      Serial.printf("Fail\n");
   #endif
 
   #ifdef IS_TEST_SERVER
@@ -87,6 +97,8 @@ int loop_index = 0;
 
 void loop() 
 {
+
+  sleep(1);return;
   int avail = 0;
   int byte_val = 0;
   uint8_t buffer[sizeof(Packet::data.data)];
@@ -95,11 +107,17 @@ void loop()
 
   size_t readed;
 
-  if((readed = (peer.receive(buffer, sizeof(buffer), 1000))) > 0)
+  if((readed = (peer.receive(buffer, sizeof(buffer), 2))) > 0)
   {
-    Serial1.write(buffer, readed);
+    Serial.write(buffer, readed);
   }
 
+  if((avail = Serial.available()) > 0)
+  {
+    auto read_size = Serial.readBytes(buffer, avail > sizeof(buffer) ? sizeof(buffer) : avail);
+
+    peer.send(buffer, read_size, 3);
+  }
   
   if((millis() - last_send_ms) > 500)
   {
@@ -120,6 +138,6 @@ void loop()
     last_send_ms = millis();
     */
    
-    Serial.printf("ping %i\n", (int)peer.get_avg_ping());
+    //Serial.printf("ping %i\n", (int)peer.get_avg_ping());
   }
 }

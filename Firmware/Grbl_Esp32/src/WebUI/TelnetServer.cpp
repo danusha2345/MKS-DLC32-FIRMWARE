@@ -90,12 +90,15 @@ namespace WebUI {
                         _telnetClients[i].stop();
                     }
                     _telnetClients[i] = _telnetserver->available();
+                    String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
+                    grbl_send(CLIENT_ALL, (char*)s.c_str());
                     break;
                 }
             }
             if (i >= MAX_TLNT_CLIENTS) {
                 //no free/disconnected spot so reject
                 _telnetserver->available().stop();
+                grbl_send(CLIENT_ALL, "[MSG:TELNET Stopped]\r\n");
             }
         }
     }

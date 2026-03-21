@@ -737,8 +737,12 @@ void probe_check() {
 		break;
 
 		case PROBE_SECODN_SUCCEED: 
-			MKS_GRBL_CMD_SEND("G92Z0\n");
-			MKS_GRBL_CMD_SEND("G0Z10F30\n");
+
+			MKS_GRBL_CMD_SEND("G21G91G38.2Z-30F100\n");
+
+			MKS_GRBL_CMD_SEND("G0Z0.3\n");
+			MKS_GRBL_CMD_SEND("G38.2Z-2F15\n");
+
 			common_pupup_info_del();
 			mks_draw_common_popup_info_com("Info", "Probe succeed!", " ", event_henadle_pupup_com);
 			probe_run.status = PROBE_NO;

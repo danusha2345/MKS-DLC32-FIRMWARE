@@ -19,11 +19,6 @@
 */
 
 #include "../Grbl.h"
-
-#ifdef ENABLE_ESPNOW_SERIAL
-    #include "../ESPNowSerial.h"
-    #include "../../esp_now_device/Device.cpp"
-#endif 
 #ifdef ENABLE_WIFI
 
 #    include <WiFi.h>
@@ -122,14 +117,6 @@ namespace WebUI {
 #    endif
 #    ifdef ENABLE_NOTIFICATIONS
         notificationsservice.begin();
-#    endif
-#    ifdef ENABLE_ESPNOW_SERIAL
-        ESPNowSerial::set_log_callback([](const char* msg) -> void
-        {
-            Uart0.print(msg);
-        });
-
-        ESPNowSerial::setup();
 #    endif
         //be sure we are not is mixed mode in setup
         WiFi.scanNetworks(true);

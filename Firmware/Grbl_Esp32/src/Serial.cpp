@@ -57,11 +57,6 @@
 
 #include "Grbl.h"
 
-#ifdef ENABLE_ESPNOW_SERIAL
-    #include "ESPNowSerial.h"
-    bool ESPNowSerial::setup_done = false;
-    EspNow::Peer ESPNowSerial::peer(ESP_NOW_SERIAL_DONGLE_PEER_ID);
-#endif
 // #include "mks/lcd_serial.h"
 
 // Define this to use the Arduino serial (UART) driver instead
@@ -164,14 +159,6 @@ static uint8_t getClientChar(uint8_t* data) {
             *data = res;
             return CLIENT_BT;
         }
-    }
-#endif
-
-#ifdef ENABLE_ESPNOW_SERIAL
-    if((res = ESPNowSerial::read()) != -1)
-    {
-        *data = res;
-        return CLIENT_SERIAL;
     }
 #endif
 
@@ -381,12 +368,6 @@ void client_write(uint8_t client, const char* text) {
     if (WebUI::SerialBT.hasClient() && (client == CLIENT_BT || client == CLIENT_ALL)) {
         WebUI::SerialBT.print(text);
         //delay(10); // possible fix for dropped characters
-    }
-#endif
-#ifdef ENABLE_ESPNOW_SERIAL
-    if(client == CLIENT_SERIAL || client == CLIENT_ALL)
-    {
-        ESPNowSerial::write((uint8_t*)text, strlen(text));
     }
 #endif
 #if defined(ENABLE_WIFI) && defined(ENABLE_HTTP) && defined(ENABLE_SERIAL2SOCKET_OUT)

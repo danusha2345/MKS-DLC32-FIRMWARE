@@ -1,0 +1,294 @@
+#include <Arduino.h>
+#include <WiFi.h>
+
+#include <uButton.h>
+#include <GyverJoy.h>
+#include <Preferences.h>
+#include <GrblParser.h>
+Preferences preferences;
+
+static const char* WIFI_SSID     = "MKS_DLC";
+static const char* WIFI_PASSWORD = "12345678";
+
+static const char* TELNET_HOST   = "192.168.4.1";
+static const uint16_t TELNET_PORT = 23;
+
+WiFiClient telnetClient;
+
+/*
+21 a
+20 b
+10 c
+9 d
+8 e
+7 f
+6 k
+*/
+
+struct Button
+{
+  uint8_t pin;
+  uButton button;
+  char key;
+
+  Button(uint8_t pin, char key) : pin(pin), button(uButton(pin)), key(key) 
+  {
+
+  }
+};
+
+Button buttons[] = 
+{
+  {21, 'A'},
+  {20, 'B'},
+  {10, 'C'},
+  {9, 'D'},
+  {8, 'E'},
+  {7, 'F'},
+  {6, 'K'}
+};
+
+#define EVERY_N_MICROS(loop_name, time) \ 
+  static uint64_t ___##loop_name = 0; \
+  for(;___##loop_name < cur_time;___##loop_name = cur_time + time)
+
+#define X_AXIS_PIN 0
+#define Y_AXIS_PIN 1
+
+#define AXIS_MIN_VAL 5
+#define AXIS_MAX_VAL 2840
+
+GyverJoy joyX = GyverJoy(X_AXIS_PIN);
+GyverJoy joyY = GyverJoy(Y_AXIS_PIN);
+
+void connectWiFiIfNeeded()
+ {
+  if (WiFi.status() == WL_CONNECTED) 
+    return;
+
+  Serial.println();
+  Serial.println("[WiFi] Connecting...");
+
+
+  WiFi.mode(WIFI_STA);
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  uint32_t startAt = millis();
+
+  while(WiFi.status() != WL_CONNECTED && (millis() - startAt) <= 5000)
+  {
+    delay(100);
+    Serial.print(".");
+  }
+
+  Serial.printf("Connected RSSI: %d IP: %s\n", WiFi.RSSI(), WiFi.localIP().toString().c_str());
+}
+
+void connectTelnetIfNeeded() 
+{
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (telnetClient.connected()) return;
+
+  Serial.println();
+  Serial.printf("[TCP] Connecting to %s:%u ...\n", TELNET_HOST, TELNET_PORT);
+
+  telnetClient.stop();
+  
+  telnetClient.setTimeout(0);
+  telnetClient.setConnectionTimeout(5000);
+
+  if (telnetClient.connect(TELNET_HOST, TELNET_PORT)) 
+  {
+    Serial.println("[TCP] Connected");
+    telnetClient.setNoDelay(true);
+  } 
+  else 
+  {
+    Serial.println("[TCP] Connect failed");
+  }
+}
+
+void wifiEvent(WiFiEvent_t event) 
+{
+  Serial.printf("[WiFi] Event: %d\n", event);
+}
+
+void wifi_thread(void* arg) 
+{
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.onEvent(wifiEvent);
+
+  while(true) 
+  {
+    connectWiFiIfNeeded();
+    connectTelnetIfNeeded();
+    delay(300);
+  }
+}
+
+void setup() 
+{
+  Serial.begin(115200);
+
+  for(auto& button : buttons)
+  {
+    attachInterruptArg(digitalPinToInterrupt(button.pin), [](void* arg) 
+    {
+      //static_cast<Button*>(arg)->button.pressISR();
+
+    }, &button, FALLING);
+  }
+
+  xTaskCreate(wifi_thread, "wifi_thread", 4096, NULL, 1, NULL);
+}
+
+enum class GrblState
+{
+  None,
+  Idle,
+  Run,
+  Hold,
+  Jog,
+  Alarm,
+  Door,
+  Check,
+  Sleep
+};
+
+GrblState grbl_state = GrblState::None;
+
+uint32_t grbl_sent_at = 0;
+bool grbl_ok_received = true;
+
+bool grbl_can_send_command()
+{
+  return telnetClient.connected() && (grbl_ok_received || (millis() - grbl_sent_at) > 1000);
+}
+
+bool grbl_send_command(String cmd)
+{
+  if(!grbl_can_send_command())
+    return false;
+
+  grbl_ok_received = false;
+  telnetClient.println(cmd);
+  telnetClient.flush();
+  grbl_sent_at = millis();
+  return true;
+}
+
+void onCommand(String cmd)
+{
+  if(cmd == "ok")
+  {
+    grbl_ok_received = true;
+    return;
+  }
+  else if(cmd.startsWith("<") && cmd.endsWith(">"))
+  {
+    auto stateStr = cmd.substring(1, cmd.indexOf('|'));
+
+    if(stateStr == "Idle")
+      grbl_state = GrblState::Idle;
+    else if(stateStr == "Run")
+      grbl_state = GrblState::Run;
+    else if(stateStr == "Hold")
+      grbl_state = GrblState::Hold;
+    else if(stateStr == "Jog")
+      grbl_state = GrblState::Jog;
+    else if(stateStr == "Alarm")
+      grbl_state = GrblState::Alarm;
+    else if(stateStr == "Door")
+      grbl_state = GrblState::Door;
+    else if(stateStr == "Check")
+      grbl_state = GrblState::Check;
+    else if(stateStr == "Sleep")
+      grbl_state = GrblState::Sleep;
+
+    Serial.printf("[STATE] %s\n", stateStr.c_str());
+  }
+
+  Serial.println(cmd + "[received]");
+}
+
+void jog(char axis, int32_t value, int32_t feedRate)
+{
+  String cmd = "$J=G91 " + String(axis) + String(value) + " F" + String(feedRate) + "\n";
+
+  Serial.print(cmd);
+
+  if(telnetClient.connected())
+  {
+    telnetClient.print(cmd);
+  }
+}
+
+void onButton(Button& button) 
+{
+  Serial.printf("[BUTTON] %c pressed\n", button.key);
+
+  if(grbl_state == GrblState::Idle)
+    jog('X', 100, 1000);
+}
+
+void readLoop()
+{
+  int avail_bytes = 0;
+
+  static char buffer[256];
+
+  static char command[512];
+  static int command_pos = 0;
+
+  while(avail_bytes = telnetClient.available())
+  {
+    auto readed = telnetClient.readBytes(buffer, min<int>(avail_bytes, sizeof(buffer)));
+
+    for(auto i = 0; i < readed; i++)
+    {
+      auto byte = buffer[i];
+
+      if(byte == '\r')
+        continue;
+
+      if(byte == '\n')
+      {
+        if(command_pos > 0)
+        {
+          command[command_pos] = 0;
+          onCommand(command);
+          command_pos = 0;
+        }
+      }
+      else
+      {
+        command[command_pos++] = byte;
+
+        if(command_pos == sizeof(command))
+          command_pos = 0;
+      }
+    }
+  }
+}
+
+void loop() 
+{
+  delay(1);
+
+  if(grbl_can_send_command())
+  {
+    grbl_send_command("?");
+  }
+
+  for(auto& button : buttons)
+  {
+    if(button.button.tick())
+    {
+      onButton(button);
+    }
+  }
+
+  readLoop();
+}

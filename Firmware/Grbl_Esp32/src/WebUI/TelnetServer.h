@@ -28,7 +28,7 @@ class WiFiClient;
 namespace WebUI {
     class Telnet_Server {
         //how many clients should be able to telnet to this ESP32
-        static const int MAX_TLNT_CLIENTS = 1;
+        static const int MAX_TLNT_CLIENTS = 3;
 
         static const int TELNETRXBUFFERSIZE = 1200;
         static const int FLUSHTIMEOUT       = 500;
