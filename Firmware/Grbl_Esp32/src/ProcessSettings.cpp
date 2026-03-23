@@ -578,7 +578,11 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
     remove_password(line, auth_level);
 
     char* value;
-    if (*line++ == '[') {  // [ESPxxx] form
+
+    if (strcmp("PING", line + 1) == 0) {
+        grbl_sendf(out->client(), "%i\r\n", millis());
+    }
+    else if (*line++ == '[') {  // [ESPxxx] form
         value = strrchr(line, ']');
         if (!value) {
             // Missing ] is an error in this form

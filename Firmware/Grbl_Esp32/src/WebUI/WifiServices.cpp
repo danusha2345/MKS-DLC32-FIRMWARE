@@ -113,7 +113,7 @@ namespace WebUI {
         web_server.begin();
 #    endif
 #    ifdef ENABLE_TELNET
-        telnet_server.begin();
+        Telnet_Server::begin_all();
 #    endif
 #    ifdef ENABLE_NOTIFICATIONS
         notificationsservice.begin();
@@ -127,7 +127,7 @@ namespace WebUI {
         notificationsservice.end();
 #    endif
 #    ifdef ENABLE_TELNET
-        telnet_server.end();
+        Telnet_Server::end_all();
 #    endif
 #    ifdef ENABLE_HTTP
         web_server.end();
@@ -162,7 +162,7 @@ namespace WebUI {
         web_server.handle();
 #    endif
 #    ifdef ENABLE_TELNET
-        telnet_server.handle();
+        Telnet_Server::handle_all();
 #    endif
     }
 }

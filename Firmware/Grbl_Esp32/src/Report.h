@@ -44,16 +44,33 @@ enum class Message : uint8_t {
     SdFileQuit      = 60,  // mc_reset was called during an SD job
 };
 
-#define CLIENT_SERIAL 0
-#define CLIENT_BT 1
-#define CLIENT_WEBUI 2
-#define CLIENT_TELNET 3
-#define CLIENT_INPUT 4
-#define CLIENT_LCD  5
-// #define CLIENT_SD  6
+enum CLIENT : uint8_t
+{
+    CLIENT_SERIAL,
+    CLIENT_BT,
+    CLIENT_WEBUI,
+    CLIENT_INPUT,
+    CLIENT_LCD,
+    //CLIENT_SD,
+
+#ifdef ENABLE_TELNET
+    CLIENT_TELNET_MIN,
+    CLIENT_TELNET_MAX = (CLIENT_TELNET_MIN + TELNET_CLIENTS_TOTAL - 1U),
+#endif
+
+    CLIENT_MAX
+};
+
+#ifdef ENABLE_TELNET
+    #define CLIENT_IS_TELNET(client) (client >= CLIENT_TELNET_MIN && client <= CLIENT_TELNET_MAX)
+#else
+    #define CLIENT_IS_TELNET(client) false
+#endif
 
 #define CLIENT_ALL 0xFF
-#define CLIENT_COUNT 6  // total number of client types regardless if they are used
+
+#define CLIENT_COUNT (CLIENT_MAX)  // total number of client types regardless if they are used
+
 // #define CLIENT_COUNT 5  // total number of client types regardless if they are used
 enum class MsgLevel : int8_t {  // Use $Message/Level
     None    = 0,

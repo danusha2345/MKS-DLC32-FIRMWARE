@@ -27,8 +27,6 @@ class WiFiClient;
 
 namespace WebUI {
     class Telnet_Server {
-        //how many clients should be able to telnet to this ESP32
-        static const int MAX_TLNT_CLIENTS = 3;
 
         static const int TELNETRXBUFFERSIZE = 1200;
         static const int FLUSHTIMEOUT       = 500;
@@ -36,9 +34,11 @@ namespace WebUI {
     public:
         Telnet_Server();
 
-        bool   begin();
+        bool   begin(uint8_t client_index);
         void   end();
-        void   handle();
+
+        void handle();
+
         size_t write(const uint8_t* buffer, size_t size);
         int    read(void);
         int    peek(void);
@@ -52,21 +52,50 @@ namespace WebUI {
         ~Telnet_Server();
 
     private:
-        static bool        _setupdone;
         static WiFiServer* _telnetserver;
-        static WiFiClient  _telnetClients[MAX_TLNT_CLIENTS];
+
+        bool        _setupdone;
+        WiFiClient  _telnetClient;
+
 #ifdef ENABLE_TELNET_WELCOME_MSG
-        static IPAddress _telnetClientsIP[MAX_TLNT_CLIENTS];
+        IPAddress _telnetClientIP;
 #endif
         static uint16_t _port;
-
-        void clearClients();
 
         uint32_t _lastflush;
         uint8_t  _RXbuffer[TELNETRXBUFFERSIZE];
         uint16_t _RXbufferSize;
         uint16_t _RXbufferpos;
-    };
 
-    extern Telnet_Server telnet_server;
+        uint8_t _client_index;
+
+        bool is_connected()
+        {
+            return _telnetClient && _telnetClient.connected();
+        }
+
+        void setup_client(WiFiClient& client)
+        {
+            _telnetClientIP = IPAddress(0, 0, 0, 0);
+
+            if(_telnetClient)
+                _telnetClient.stop();
+            
+            _telnetClient = client;
+        }
+
+    public:
+        static void begin_all();
+        static void handle_all();
+        static void end_all();
+
+        static void write(uint8_t client, const uint8_t* buffer, size_t size);
+        static bool read(char* code, uint8_t* client);
+
+        static int get_rx_buffer_available(uint8_t client);
+
+        static void _handle_all_real();
+    };
+    
+    extern Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];
 }

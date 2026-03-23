@@ -29,145 +29,240 @@
 #    include <WiFi.h>
 
 namespace WebUI {
-    Telnet_Server telnet_server;
-    bool          Telnet_Server::_setupdone    = false;
+    Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];
     uint16_t      Telnet_Server::_port         = 0;
     WiFiServer*   Telnet_Server::_telnetserver = NULL;
-    WiFiClient    Telnet_Server::_telnetClients[MAX_TLNT_CLIENTS];
 
-#    ifdef ENABLE_TELNET_WELCOME_MSG
-    IPAddress Telnet_Server::_telnetClientsIP[MAX_TLNT_CLIENTS];
-#    endif
+    #ifdef ENABLE_TELNET_OTHER_TASK
+        TaskHandle_t _telnet_task;
+    #endif
+
+    #define CLIENT_TELNET_INDEX(client) (client - CLIENT_TELNET_MIN)
+    #define CLIENT_TELNET_VAL(i) (i + CLIENT_TELNET_MIN)
+
+    void Telnet_Server::begin_all()
+    {
+        if (telnet_enable->get() == 0) {
+            return;
+        }
+
+        _port = telnet_port->get();
+
+        //create instance
+        _telnetserver = new WiFiServer(_port, TELNET_CLIENTS_TOTAL);
+        _telnetserver->setNoDelay(true);
+        
+        String s = "[MSG:TELNET Started " + String(_port) + "]\r\n";
+        grbl_send(CLIENT_ALL, (char*)s.c_str());
+        //start telnet server
+        _telnetserver->begin();
+
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+            telnet_server[i].begin(i);
+            
+        #ifdef ENABLE_TELNET_OTHER_TASK
+            xTaskCreatePinnedToCore([](void* arg) 
+            {
+                while(true)
+                {
+                    Telnet_Server::_handle_all_real();
+                    delayMicroseconds(100);
+                }
+            },    // task
+            "telnet_task",  // name for task
+            4096,               // size of task stack
+            NULL,               // parameters
+            2,                  // priority
+            &_telnet_task,
+            SUPPORT_TASK_CORE);  // must run the task on same core
+        #endif
+    }
+
+    void Telnet_Server::end_all()
+    {
+        if(_telnet_task)
+        {
+            vTaskDelete(_telnet_task);
+            _telnet_task = NULL;
+        }
+
+        if (_telnetserver) 
+        {
+            delete _telnetserver;
+            _telnetserver = NULL;
+        }
+
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+            telnet_server[i].end();
+    }
+
+    void Telnet_Server::handle_all()
+    {
+
+    }
+
+    void Telnet_Server::_handle_all_real()
+    {
+        if(_telnetserver == NULL)
+            return;
+
+        bool client_found = false;
+        
+        if (_telnetserver->hasClient()) 
+        {
+            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+            {
+                //find free/disconnected spot
+                if (!telnet_server[i].is_connected()) 
+                {
+                    auto client = _telnetserver->available();
+                    telnet_server[i].setup_client(client);
+
+                    String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
+                    grbl_send(CLIENT_ALL, (char*)s.c_str());
+                    client_found = true;
+                    break;
+                }
+            }
+
+            if(!client_found)
+                _telnetserver->available().stop();
+        }
+        
+        #ifndef ENABLE_TELNET_OTHER_TASK
+            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+                telnet_server[i].handle();
+        #endif
+    }
+
+    void Telnet_Server::write(uint8_t client, const uint8_t* buffer, size_t size)
+    {
+        uint8_t index = CLIENT_TELNET_INDEX(client);
+
+        if(index >= 0 && index < TELNET_CLIENTS_TOTAL)
+            telnet_server[index].write(buffer, size);
+    }
+
+    
+    bool Telnet_Server::read(char* code, uint8_t* client)
+    {
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+        {
+            if(telnet_server[i].available())
+            {
+                *code = telnet_server[i].read();
+                *client = CLIENT_TELNET_VAL(i);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    int Telnet_Server::get_rx_buffer_available(uint8_t client)
+    {
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+        {
+            if(CLIENT_TELNET_VAL(i) == client)
+            {
+                return WebUI::telnet_server[i].get_rx_buffer_available();
+            }
+        }
+
+        return 0;
+    }
 
     Telnet_Server::Telnet_Server() {
         _RXbufferSize = 0;
         _RXbufferpos  = 0;
     }
 
-    bool Telnet_Server::begin() {
+    bool Telnet_Server::begin(uint8_t client_index) {
         bool no_error = true;
         end();
         _RXbufferSize = 0;
         _RXbufferpos  = 0;
 
-        if (telnet_enable->get() == 0) {
-            return false;
-        }
-        _port = telnet_port->get();
-
-        //create instance
-        _telnetserver = new WiFiServer(_port, MAX_TLNT_CLIENTS);
-        _telnetserver->setNoDelay(true);
-        String s = "[MSG:TELNET Started " + String(_port) + "]\r\n";
-        grbl_send(CLIENT_ALL, (char*)s.c_str());
-        //start telnet server
-        _telnetserver->begin();
+        _client_index = client_index;
         _setupdone = true;
-        return no_error;
     }
 
     void Telnet_Server::end() {
         _setupdone    = false;
         _RXbufferSize = 0;
         _RXbufferpos  = 0;
-        if (_telnetserver) {
-            delete _telnetserver;
-            _telnetserver = NULL;
-        }
-    }
-
-    void Telnet_Server::clearClients() {
-        //check if there are any new clients
-        if (_telnetserver->hasClient()) {
-            uint8_t i;
-            for (i = 0; i < MAX_TLNT_CLIENTS; i++) {
-                //find free/disconnected spot
-                if (!_telnetClients[i] || !_telnetClients[i].connected()) {
-#    ifdef ENABLE_TELNET_WELCOME_MSG
-                    _telnetClientsIP[i] = IPAddress(0, 0, 0, 0);
-#    endif
-                    if (_telnetClients[i]) {
-                        _telnetClients[i].stop();
-                    }
-                    _telnetClients[i] = _telnetserver->available();
-                    String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
-                    grbl_send(CLIENT_ALL, (char*)s.c_str());
-                    break;
-                }
-            }
-            if (i >= MAX_TLNT_CLIENTS) {
-                //no free/disconnected spot so reject
-                _telnetserver->available().stop();
-                grbl_send(CLIENT_ALL, "[MSG:TELNET Stopped]\r\n");
-            }
-        }
     }
 
     size_t Telnet_Server::write(const uint8_t* buffer, size_t size) {
         size_t wsize = 0;
-        if (!_setupdone || _telnetserver == NULL) {
+        if (!_setupdone) {
             log_d("[TELNET out blocked]");
             return 0;
         }
-
-        clearClients();
-
+        
         //log_d("[TELNET out]");
         //push UART data to all connected telnet clients
-        for (uint8_t i = 0; i < MAX_TLNT_CLIENTS; i++) {
-            if (_telnetClients[i] && _telnetClients[i].connected()) {
-                //log_d("[TELNET out connected]");
-                wsize = _telnetClients[i].write(buffer, size);
-                COMMANDS::wait(0);
-            }
+        if (is_connected())
+        {
+            //log_d("[TELNET out connected]");
+            wsize = _telnetClient.write(buffer, size);
+            COMMANDS::wait(0);
         }
+
         return wsize;
     }
 
-    void Telnet_Server::handle() {
+    void Telnet_Server::handle()
+    {
         COMMANDS::wait(0);
         //check if can read
-        if (!_setupdone || _telnetserver == NULL) {
+        if (!_setupdone) {
             return;
         }
-        clearClients();
+
         //check clients for data
         //uint8_t c;
-        for (uint8_t i = 0; i < MAX_TLNT_CLIENTS; i++) {
-            if (_telnetClients[i] && _telnetClients[i].connected()) {
+
+        if (is_connected()) 
+        {
 #    ifdef ENABLE_TELNET_WELCOME_MSG
-                if (_telnetClientsIP[i] != _telnetClients[i].remoteIP()) {
-                    report_init_message(CLIENT_TELNET);
-                    _telnetClientsIP[i] = _telnetClients[i].remoteIP();
-                }
-#    endif
-                if (_telnetClients[i].available()) {
-                    uint8_t buf[1024];
-                    COMMANDS::wait(0);
-                    int readlen  = _telnetClients[i].available();
-                    int writelen = TELNETRXBUFFERSIZE - available();
-                    if (readlen > 1024) {
-                        readlen = 1024;
-                    }
-                    if (readlen > writelen) {
-                        readlen = writelen;
-                    }
-                    if (readlen > 0) {
-                        _telnetClients[i].read(buf, readlen);
-                        push(buf, readlen);
-                    }
-                    return;
-                }
-            } else {
-                if (_telnetClients[i]) {
-#    ifdef ENABLE_TELNET_WELCOME_MSG
-                    _telnetClientsIP[i] = IPAddress(0, 0, 0, 0);
-#    endif
-                    _telnetClients[i].stop();
-                }
+            if (_telnetClientIP != _telnetClient.remoteIP()) 
+            {
+                report_init_message(CLIENT_TELNET_VAL(_client_index));
+                _telnetClientIP = _telnetClient.remoteIP();
             }
-            COMMANDS::wait(0);
+#    endif
+            if (_telnetClient.available()) 
+            {
+                uint8_t buf[1024];
+                COMMANDS::wait(0);
+                int readlen  = _telnetClient.available();
+                int writelen = TELNETRXBUFFERSIZE - available();
+                if (readlen > 1024) {
+                    readlen = 1024;
+                }
+                if (readlen > writelen) {
+                    readlen = writelen;
+                }
+                if (readlen > 0) {
+                    _telnetClient.read(buf, readlen);
+                    push(buf, readlen);
+                }
+                return;
+            }
+        } 
+        else 
+        {
+            if (_telnetClient) 
+            {
+#    ifdef ENABLE_TELNET_WELCOME_MSG
+                _telnetClientIP = IPAddress(0, 0, 0, 0);
+#    endif
+                _telnetClient.stop();
+            }
         }
+            
+        COMMANDS::wait(0);
     }
 
     int Telnet_Server::peek(void) {

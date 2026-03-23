@@ -52,7 +52,7 @@ namespace WebUI {
 
     void ESPResponseStream::println(const char* data) {
         print(data);
-        if (_client == CLIENT_TELNET) {
+        if (CLIENT_IS_TELNET(_client)) {
             print("\r\n");
         } else {
             print("\n");

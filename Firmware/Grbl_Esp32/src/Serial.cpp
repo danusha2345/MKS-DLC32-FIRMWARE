@@ -169,9 +169,13 @@ static uint8_t getClientChar(uint8_t* data) {
     }
 #endif
 #if defined(ENABLE_WIFI) && defined(ENABLE_TELNET)
-    if (WebUI::telnet_server.available()) {
-        *data = WebUI::telnet_server.read();
-        return CLIENT_TELNET;
+    char tchar;
+    uint8_t tclient;
+
+    if(WebUI::Telnet_Server::read(&tchar, &tclient))
+    {
+        *data = tchar;
+        return tclient;
     }
 #endif
     return CLIENT_ALL;
@@ -376,8 +380,8 @@ void client_write(uint8_t client, const char* text) {
     }
 #endif
 #if defined(ENABLE_WIFI) && defined(ENABLE_TELNET)
-    if (client == CLIENT_TELNET || client == CLIENT_ALL) {
-        WebUI::telnet_server.write((const uint8_t*)text, strlen(text));
+    if (CLIENT_IS_TELNET(client) || client == CLIENT_ALL) {
+        WebUI::Telnet_Server::write(client, (const uint8_t*)text, strlen(text));
     }
 #endif
     if (client == CLIENT_SERIAL || client == CLIENT_ALL || client == CLIENT_LCD) {

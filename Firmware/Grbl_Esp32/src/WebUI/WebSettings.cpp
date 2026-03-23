@@ -453,7 +453,8 @@ namespace WebUI {
             webPrintln("Web port: ", String(web_server.port()));
 #    endif
 #    if defined(ENABLE_TELNET)
-            webPrintln("Data port: ", String(telnet_server.port()));
+            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+                webPrintln("Data port: ", String(telnet_server[i].port()));
 #    endif
             webPrintln("Hostname: ", wifi_config.Hostname());
         }
