@@ -46,6 +46,9 @@ void grbl_init() {
     WiFi.enableSTA(false);
     WiFi.enableAP(false);
     WiFi.mode(WIFI_OFF);
+    
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); 
+
     client_init();  // Setup serial baud rate and interrupts
     display_init();
 

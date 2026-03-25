@@ -580,7 +580,8 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
     char* value;
 
     if (strcmp("PING", line + 1) == 0) {
-        grbl_sendf(out->client(), "%i\r\n", millis());
+        grbl_sendf(out->client(), "ping ok\r\n");
+        return Error::Ok;
     }
     else if (*line++ == '[') {  // [ESPxxx] form
         value = strrchr(line, ']');

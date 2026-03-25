@@ -34,7 +34,7 @@ namespace WebUI {
     public:
         Telnet_Server();
 
-        bool   begin(uint8_t client_index);
+        bool   begin();
         void   end();
 
         void handle();
@@ -71,14 +71,14 @@ namespace WebUI {
 
         bool is_connected()
         {
-            return _telnetClient && _telnetClient.connected();
+            return _telnetClient.connected();
         }
 
         void setup_client(WiFiClient& client)
         {
             _telnetClientIP = IPAddress(0, 0, 0, 0);
 
-            if(_telnetClient)
+            if(_telnetClient.connected())
                 _telnetClient.stop();
             
             _telnetClient = client;
@@ -94,7 +94,7 @@ namespace WebUI {
 
         static int get_rx_buffer_available(uint8_t client);
 
-        static void _handle_all_real();
+        static void _handle_clients();
     };
     
     extern Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];

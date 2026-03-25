@@ -58,8 +58,11 @@ namespace WebUI {
         _telnetserver->begin();
 
         for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
-            telnet_server[i].begin(i);
-            
+        {
+            telnet_server[i]._client_index = i;
+            telnet_server[i].begin();
+        }
+
         #ifdef ENABLE_TELNET_OTHER_TASK
             xTaskCreatePinnedToCore([](void* arg) 
             {
@@ -80,11 +83,13 @@ namespace WebUI {
 
     void Telnet_Server::end_all()
     {
-        if(_telnet_task)
-        {
-            vTaskDelete(_telnet_task);
-            _telnet_task = NULL;
-        }
+        #ifdef ENABLE_TELNET_OTHER_TASK
+            if(_telnet_task)
+            {
+                vTaskDelete(_telnet_task);
+                _telnet_task = NULL;
+            }
+        #endif
 
         if (_telnetserver) 
         {
@@ -97,11 +102,6 @@ namespace WebUI {
     }
 
     void Telnet_Server::handle_all()
-    {
-
-    }
-
-    void Telnet_Server::_handle_all_real()
     {
         if(_telnetserver == NULL)
             return;
@@ -116,6 +116,8 @@ namespace WebUI {
                 if (!telnet_server[i].is_connected()) 
                 {
                     auto client = _telnetserver->available();
+
+                    client.setNoDelay(true);
                     telnet_server[i].setup_client(client);
 
                     String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
@@ -126,13 +128,21 @@ namespace WebUI {
             }
 
             if(!client_found)
+            {
                 _telnetserver->available().stop();
+                grbl_send(CLIENT_ALL, "[MSG:TELNET Clinet rejected");
+            }
         }
         
         #ifndef ENABLE_TELNET_OTHER_TASK
-            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
-                telnet_server[i].handle();
+            _handle_clients();
         #endif
+    }
+
+    void Telnet_Server::_handle_clients()
+    {
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+            telnet_server[i].handle();
     }
 
     void Telnet_Server::write(uint8_t client, const uint8_t* buffer, size_t size)
@@ -177,14 +187,12 @@ namespace WebUI {
         _RXbufferpos  = 0;
     }
 
-    bool Telnet_Server::begin(uint8_t client_index) {
-        bool no_error = true;
+    bool Telnet_Server::begin() {
         end();
         _RXbufferSize = 0;
         _RXbufferpos  = 0;
-
-        _client_index = client_index;
         _setupdone = true;
+        return true;
     }
 
     void Telnet_Server::end() {
@@ -310,13 +318,16 @@ namespace WebUI {
                 _RXbuffer[current] = data[i];
                 current++;
                 data_processed++;
-
-                COMMANDS::wait(0);
                 //vTaskDelay(1 / portTICK_RATE_MS);  // Yield to other tasks
             }
+            
             _RXbufferSize += data_processed;
+            
+            COMMANDS::wait(0);
+
             return true;
         }
+
         return false;
     }
 

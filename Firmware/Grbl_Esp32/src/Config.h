@@ -106,7 +106,7 @@ const int MAX_N_AXIS = 6;
 #    define WIFI_OR_BLUETOOTH
 #endif
 
-#define ENABLE_HTTP                     /* enable HTTP and all related services              */                   
+//#define ENABLE_HTTP                     /* enable HTTP and all related services              */                   
 #define ENABLE_OTA                      /* enable OTA                                        */
 #define ENABLE_TELNET                   /* enable telnet                                     */
 #define ENABLE_TELNET_WELCOME_MSG       /* display welcome string when connect to telnet     */                           
@@ -114,10 +114,10 @@ const int MAX_N_AXIS = 6;
 // #define ENABLE_SSDP                  /* enable UPNP discovery                             */   
 // #define ENABLE_NOTIFICATIONS         /* enable notifications                              */   
 
-#define ENABLE_TELNET_OTHER_TASK
+//#define ENABLE_TELNET_OTHER_TASK
 
-#define ENABLE_SERIAL2SOCKET_IN
-#define ENABLE_SERIAL2SOCKET_OUT
+//#define ENABLE_SERIAL2SOCKET_IN
+//#define ENABLE_SERIAL2SOCKET_OUT
 
 #define TELNET_CLIENTS_TOTAL 3
 
