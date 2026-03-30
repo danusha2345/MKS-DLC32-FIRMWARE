@@ -574,13 +574,54 @@ Error do_command_or_setting(const char* key, char* value, WebUI::AuthenticationL
     return Error::InvalidStatement;
 }
 
+void print_reset_reason(uint8_t client) {
+    esp_reset_reason_t reason = esp_reset_reason();
+    switch (reason) {
+        case ESP_RST_UNKNOWN:
+            grbl_sendf(client, "Reset reason can not be determined\r\n");
+            break;
+        case ESP_RST_POWERON:
+            grbl_sendf(client, "Reset due to power-on event\r\n");
+            break;
+        case ESP_RST_EXT:
+            grbl_sendf(client, "Reset by external pin (software or hardware) [e.g. pull down EN pin]\r\n");
+            break;
+        case ESP_RST_SW:
+            grbl_sendf(client, "Software reset CPU\r\n");
+            break;
+        case ESP_RST_WDT:
+            grbl_sendf(client, "RTC Watchdog reset CPU\r\n");
+            break;
+        case ESP_RST_DEEPSLEEP:
+            grbl_sendf(client, "Reset after deep sleep wake up\r\n");
+            break;
+        case ESP_RST_BROWNOUT:
+            grbl_sendf(client, "Brownout reset (software or hardware)\r\n");
+            break;
+        case ESP_RST_SDIO:
+            grbl_sendf(client, "Reset over SDIO\r\n");
+            break;
+    }
+
+    grbl_sendf(client, "Reset reason num: %d\r\n", reason);
+}
+
 Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::AuthenticationLevel auth_level) {
     remove_password(line, auth_level);
 
     char* value;
 
     if (strcmp("PING", line + 1) == 0) {
+
+        for(auto i = 0; i < 32; i++)
+            grbl_sendf(out->client(), "test text\r\n");
+
         grbl_sendf(out->client(), "ping ok\r\n");
+        
+        return Error::Ok;
+    }
+    else if (strcmp("RESET_REASON", line + 1) == 0) {
+        print_reset_reason(out->client());
         return Error::Ok;
     }
     else if (*line++ == '[') {  // [ESPxxx] form

@@ -1,0 +1,22 @@
+;	              Name: Профиль поверху_M-D0.5MM
+;	              Tool: Фреза обрезка
+;	    Tool passDepth: 4
+;	     Tool stepover: 0.25
+;	Tool feedRate mm/s: 0.75
+;	             Depth: 1.5
+;	              Side: Top
+G21 G17 G90
+M3 S12000
+G0Z5
+X40.64Y-38.1
+Z1
+G1Z-1.5F120
+Y0F45
+X0
+Y-38.1
+X40.64
+G0Z2
+Z5
+X0Y0
+M5
+M30

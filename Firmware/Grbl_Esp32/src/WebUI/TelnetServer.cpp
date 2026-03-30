@@ -147,10 +147,18 @@ namespace WebUI {
 
     void Telnet_Server::write(uint8_t client, const uint8_t* buffer, size_t size)
     {
-        uint8_t index = CLIENT_TELNET_INDEX(client);
+        if(client == CLIENT_ALL)
+        {
+            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+                telnet_server[i].write(buffer, size);
+        }
+        else
+        {
+            uint8_t index = CLIENT_TELNET_INDEX(client);
 
-        if(index >= 0 && index < TELNET_CLIENTS_TOTAL)
-            telnet_server[index].write(buffer, size);
+            if(index >= 0 && index < TELNET_CLIENTS_TOTAL)
+                telnet_server[index].write(buffer, size);
+        }
     }
 
     

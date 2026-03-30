@@ -30,7 +30,7 @@ def recv_until_crlf(sock):
 
     return buffer[:-2]
 
-def ping_tcp_single_connection(ip, port, message="$PING\n", count=3000, timeout=5):
+def ping_tcp_single_connection(ip, port, message="$PING\n", count=30000, timeout=5):
     times = []
     success = 0
     failed = 0
@@ -70,7 +70,7 @@ def ping_tcp_single_connection(ip, port, message="$PING\n", count=3000, timeout=
             break  # если соединение умерло — дальше нет смысла
 
         
-        time.sleep(0.030)
+        #time.sleep(0.030)
 
 
     sock.close()
