@@ -78,12 +78,18 @@ Error add_char_to_line(char c, uint8_t client) {
     return Error::Ok;
 }
 
+bool is_sd_save_mode = false;
+
 Error execute_line(char* line, uint8_t client, WebUI::AuthenticationLevel auth_level) {
     Error result = Error::Ok;
     // Empty or comment line. For syncing purposes.
     if (line[0] == 0) {
         return Error::Ok;
     }
+
+    if(is_sd_save_mode)
+        return Error::Ok;
+    
     // Grbl '$' or WebUI '[ESPxxx]' system command
     if (line[0] == '$' || line[0] == '[') {
         return system_execute_line(line, client, auth_level);

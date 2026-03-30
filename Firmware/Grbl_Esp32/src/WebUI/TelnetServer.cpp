@@ -31,7 +31,7 @@
 namespace WebUI {
     Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];
     uint16_t      Telnet_Server::_port         = 0;
-    WiFiServer*   Telnet_Server::_telnetserver = NULL;
+    AsyncServer*   Telnet_Server::_telnetserver = NULL;
 
     #ifdef ENABLE_TELNET_OTHER_TASK
         TaskHandle_t _telnet_task;
@@ -39,6 +39,37 @@ namespace WebUI {
 
     #define CLIENT_TELNET_INDEX(client) (client - CLIENT_TELNET_MIN)
     #define CLIENT_TELNET_VAL(i) (i + CLIENT_TELNET_MIN)
+
+    void telnet_handle_client(void *arg, AsyncClient *client) 
+    {
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+        {
+            if (!telnet_server[i].is_connected()) 
+            {
+                telnet_server[i].setup_client(client);
+
+                String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
+                grbl_send(CLIENT_ALL, (char*)s.c_str());
+                break;
+            }
+        }
+    }
+
+    void Telnet_Server::setup_client(AsyncClient* client)
+    {
+        _telnetClientIP = IPAddress(0, 0, 0, 0);
+
+        _telnetClient = client;
+        
+
+        client->onData([](void *arg, AsyncClient *client, void *data, size_t len) 
+        {
+            auto ptr = static_cast<Telnet_Server*>(arg);
+            ptr->push((uint8_t*)data, len);
+
+        }, this);
+    }
+
 
     void Telnet_Server::begin_all()
     {
@@ -49,12 +80,13 @@ namespace WebUI {
         _port = telnet_port->get();
 
         //create instance
-        _telnetserver = new WiFiServer(_port, TELNET_CLIENTS_TOTAL);
+        _telnetserver = new AsyncServer(_port);
         _telnetserver->setNoDelay(true);
         
         String s = "[MSG:TELNET Started " + String(_port) + "]\r\n";
         grbl_send(CLIENT_ALL, (char*)s.c_str());
         //start telnet server
+        _telnetserver->onClient(&telnet_handle_client, nullptr);
         _telnetserver->begin();
 
         for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
@@ -93,6 +125,7 @@ namespace WebUI {
 
         if (_telnetserver) 
         {
+            _telnetserver->end();
             delete _telnetserver;
             _telnetserver = NULL;
         }
@@ -106,34 +139,6 @@ namespace WebUI {
         if(_telnetserver == NULL)
             return;
 
-        bool client_found = false;
-        
-        if (_telnetserver->hasClient()) 
-        {
-            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
-            {
-                //find free/disconnected spot
-                if (!telnet_server[i].is_connected()) 
-                {
-                    auto client = _telnetserver->available();
-
-                    client.setNoDelay(true);
-                    telnet_server[i].setup_client(client);
-
-                    String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
-                    grbl_send(CLIENT_ALL, (char*)s.c_str());
-                    client_found = true;
-                    break;
-                }
-            }
-
-            if(!client_found)
-            {
-                _telnetserver->available().stop();
-                grbl_send(CLIENT_ALL, "[MSG:TELNET Clinet rejected");
-            }
-        }
-        
         #ifndef ENABLE_TELNET_OTHER_TASK
             _handle_clients();
         #endif
@@ -190,23 +195,24 @@ namespace WebUI {
         return 0;
     }
 
-    Telnet_Server::Telnet_Server() {
-        _RXbufferSize = 0;
-        _RXbufferpos  = 0;
+    Telnet_Server::Telnet_Server() 
+    {
     }
 
-    bool Telnet_Server::begin() {
+    bool Telnet_Server::begin() 
+    {
         end();
-        _RXbufferSize = 0;
-        _RXbufferpos  = 0;
-        _setupdone = true;
+
+        if(_ring_buffer == NULL)
+            _ring_buffer = xQueueCreate(TELNETRXBUFFERSIZE, sizeof(char));
+
         return true;
     }
 
-    void Telnet_Server::end() {
+    void Telnet_Server::end() 
+    {
         _setupdone    = false;
-        _RXbufferSize = 0;
-        _RXbufferpos  = 0;
+        _telnetClient = NULL;
     }
 
     size_t Telnet_Server::write(const uint8_t* buffer, size_t size) {
@@ -221,7 +227,8 @@ namespace WebUI {
         if (is_connected())
         {
             //log_d("[TELNET out connected]");
-            wsize = _telnetClient.write(buffer, size);
+            
+            wsize = _telnetClient->write((char*)buffer, size);
             COMMANDS::wait(0);
         }
 
@@ -242,116 +249,55 @@ namespace WebUI {
         if (is_connected()) 
         {
 #    ifdef ENABLE_TELNET_WELCOME_MSG
-            if (_telnetClientIP != _telnetClient.remoteIP()) 
+            if (_telnetClientIP != _telnetClient->remoteIP()) 
             {
                 report_init_message(CLIENT_TELNET_VAL(_client_index));
-                _telnetClientIP = _telnetClient.remoteIP();
+                _telnetClientIP = _telnetClient->remoteIP();
             }
 #    endif
-            if (_telnetClient.available()) 
-            {
-                uint8_t buf[1024];
-                COMMANDS::wait(0);
-                int readlen  = _telnetClient.available();
-                int writelen = TELNETRXBUFFERSIZE - available();
-                if (readlen > 1024) {
-                    readlen = 1024;
-                }
-                if (readlen > writelen) {
-                    readlen = writelen;
-                }
-                if (readlen > 0) {
-                    _telnetClient.read(buf, readlen);
-                    push(buf, readlen);
-                }
-                return;
-            }
         } 
-        else 
-        {
-            if (_telnetClient) 
-            {
-#    ifdef ENABLE_TELNET_WELCOME_MSG
-                _telnetClientIP = IPAddress(0, 0, 0, 0);
-#    endif
-                _telnetClient.stop();
-            }
-        }
-            
+
         COMMANDS::wait(0);
     }
 
-    int Telnet_Server::peek(void) {
-        if (_RXbufferSize > 0) {
-            return _RXbuffer[_RXbufferpos];
-        } else {
-            return -1;
-        }
+    int Telnet_Server::peek(void) 
+    {
+        uint8_t byte;
+
+        if(_ring_buffer && xQueuePeek(_ring_buffer, &byte, 0) == pdTRUE)
+            return byte;
+
+        return -1;
     }
 
-    int Telnet_Server::available() { return _RXbufferSize; }
+    int Telnet_Server::available() { return _ring_buffer ? uxQueueMessagesWaiting(_ring_buffer) : 0; }
 
-    int Telnet_Server::get_rx_buffer_available() { return TELNETRXBUFFERSIZE - _RXbufferSize; }
+    int Telnet_Server::get_rx_buffer_available() { return _ring_buffer ? uxQueueSpacesAvailable(_ring_buffer) : 0; }
 
-    bool Telnet_Server::push(uint8_t data) {
-        log_i("[TELNET]push %c", data);
-        if ((1 + _RXbufferSize) <= TELNETRXBUFFERSIZE) {
-            int current = _RXbufferpos + _RXbufferSize;
-            if (current > TELNETRXBUFFERSIZE) {
-                current = current - TELNETRXBUFFERSIZE;
-            }
-            if (current > (TELNETRXBUFFERSIZE - 1)) {
-                current = 0;
-            }
-            _RXbuffer[current] = data;
-            _RXbufferSize++;
-            log_i("[TELNET]buffer size %d", _RXbufferSize);
-            return true;
-        }
-        return false;
+    bool Telnet_Server::push(uint8_t data) 
+    {
+        return _ring_buffer && xQueueSend(_ring_buffer, &data, 0) == pdTRUE;
     }
 
-    bool Telnet_Server::push(const uint8_t* data, int data_size) {
-        if ((data_size + _RXbufferSize) <= TELNETRXBUFFERSIZE) {
-            int data_processed = 0;
-            int current        = _RXbufferpos + _RXbufferSize;
-            if (current > TELNETRXBUFFERSIZE) {
-                current = current - TELNETRXBUFFERSIZE;
-            }
-            for (int i = 0; i < data_size; i++) {
-                if (current > (TELNETRXBUFFERSIZE - 1)) {
-                    current = 0;
-                }
-
-                _RXbuffer[current] = data[i];
-                current++;
-                data_processed++;
-                //vTaskDelay(1 / portTICK_RATE_MS);  // Yield to other tasks
-            }
-            
-            _RXbufferSize += data_processed;
-            
-            COMMANDS::wait(0);
-
-            return true;
+    bool Telnet_Server::push(const uint8_t* data, int data_size) 
+    {
+        if(_ring_buffer)
+        {
+            for(auto i = 0; i < data_size; i++)
+                xQueueSend(_ring_buffer, &data[i], 0);
         }
 
-        return false;
+        return true;
     }
 
     int Telnet_Server::read(void) {
-        if (_RXbufferSize > 0) {
-            int v = _RXbuffer[_RXbufferpos];
-            //log_d("[TELNET]read %c",char(v));
-            _RXbufferpos++;
-            if (_RXbufferpos > (TELNETRXBUFFERSIZE - 1)) {
-                _RXbufferpos = 0;
-            }
-            _RXbufferSize--;
-            return v;
-        } else {
-            return -1;
-        }
+
+        uint8_t byte = 0;
+
+        if(_ring_buffer && xQueueReceive(_ring_buffer, &byte, 0))
+            return byte;
+
+        return -1;
     }
 
     Telnet_Server::~Telnet_Server() { end(); }

@@ -574,7 +574,7 @@ Error do_command_or_setting(const char* key, char* value, WebUI::AuthenticationL
     return Error::InvalidStatement;
 }
 
-void print_reset_reason(uint8_t client) {
+void print_esp_info(uint8_t client) {
     esp_reset_reason_t reason = esp_reset_reason();
     switch (reason) {
         case ESP_RST_UNKNOWN:
@@ -604,6 +604,7 @@ void print_reset_reason(uint8_t client) {
     }
 
     grbl_sendf(client, "Reset reason num: %d\r\n", reason);
+    grbl_sendf(client, "Heap: %d\r\n", ESP.getFreeHeap());
 }
 
 Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::AuthenticationLevel auth_level) {
@@ -611,17 +612,15 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
 
     char* value;
 
-    if (strcmp("PING", line + 1) == 0) {
-
-        for(auto i = 0; i < 32; i++)
-            grbl_sendf(out->client(), "test text\r\n");
-
+    if (strcmp("PING", line + 1) == 0) 
+    {
         grbl_sendf(out->client(), "ping ok\r\n");
-        
         return Error::Ok;
     }
-    else if (strcmp("RESET_REASON", line + 1) == 0) {
-        print_reset_reason(out->client());
+    else if (strcmp("INFO", line + 1) == 0) 
+    {
+        is_sd_save_mode = 1;
+        print_esp_info(out->client());
         return Error::Ok;
     }
     else if (*line++ == '[') {  // [ESPxxx] form
