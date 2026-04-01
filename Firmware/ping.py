@@ -44,6 +44,8 @@ def ping_tcp_single_connection(ip, port, message="$PING\n", count=30000, timeout
         print(f"Ошибка подключения: {e}")
         return
 
+    sock.sendall("[NODELAY]1\r\n".encode())
+
     for i in range(1, count + 1):
 
         try:

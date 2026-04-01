@@ -70,8 +70,6 @@ namespace WebUI {
 
         uint8_t _client_index;
 
-        QueueHandle_t _ring_buffer = NULL;
-
     public:
 
         bool is_connected()
@@ -80,6 +78,7 @@ namespace WebUI {
         }
 
         void setup_client(AsyncClient* client);
+        void on_disconect(AsyncClient* client);
 
         static void begin_all();
         static void handle_all();
@@ -91,6 +90,8 @@ namespace WebUI {
         static int get_rx_buffer_available(uint8_t client);
 
         static void _handle_clients();
+
+        static void _set_no_delay(uint8_t client, bool nodelay);
     };
     
     extern Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];

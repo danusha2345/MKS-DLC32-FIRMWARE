@@ -2,6 +2,9 @@
 #include <map>
 #include "Regex.h"
 
+#ifdef ENABLE_TELNET
+    #include "WebUI/TelnetServer.h"
+#endif
 // WG Readable and writable as guest
 // WU Readable and writable as user and admin
 // WA Readable as user and admin, writable as admin
@@ -619,7 +622,6 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
     }
     else if (strcmp("INFO", line + 1) == 0) 
     {
-        is_sd_save_mode = 1;
         print_esp_info(out->client());
         return Error::Ok;
     }
@@ -645,6 +647,31 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
     }
 
     char* key = normalize_key(line);
+
+#ifdef ENABLE_TELNET
+    if (key && strcmp("NODELAY", key) == 0) 
+    {
+        bool no_delay;
+
+        switch(value[0])
+        {
+            case '1':
+                no_delay = true;
+                break;
+
+            case '0':
+                no_delay = false;
+                break;
+
+            default:
+                return Error::InvalidStatement;
+        }
+
+        grbl_sendf(out->client(), "AsyncClient::setNoDelay(%d)\r\n", (int)no_delay);
+        WebUI::Telnet_Server::_set_no_delay(out->client(), no_delay);
+        return Error::Ok;
+    }
+#endif
 
     // At this point there are three possibilities for value
     // NULL - $xxx without =
