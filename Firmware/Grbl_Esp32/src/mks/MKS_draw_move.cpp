@@ -257,7 +257,7 @@ static void set_xyz_pos(lv_obj_t* obj, lv_event_t event) {
 static void set_knife() {
 
 	if(probe_invert->get()) {
-		MKS_GRBL_CMD_SEND("G21 G91 G38.2 Z-50 F80\n");
+		MKS_GRBL_CMD_SEND("G21 G91 G38.2 Z-50 F200\n");
 		mks_draw_common_pupup_info("Info", "Setting probe...", " ");
 		probe_run.status = PROBE_STAR;
 
@@ -710,8 +710,9 @@ void probe_check() {
 		break;
 
 		case PROBE_STAR: 
-			if(probe_run.flag == 1) {
-				MKS_GRBL_CMD_SEND("G0Z0.5\n");
+			if(probe_run.flag == 1) 
+			{
+				MKS_GRBL_CMD_SEND("G91G1 Z0.5 F100\n");
 				probe_run.status = PROBE_FITST_SUCCEED;
 			} 
 			else if(probe_run.flag == 2) probe_run.status = PROBE_FITST_FAIL;
@@ -722,8 +723,12 @@ void probe_check() {
 
 		case PROBE_FITST_SUCCEED: 
 			// grbl_send(CLIENT_SERIAL, "enter first secceed\n");
-			MKS_GRBL_CMD_SEND("G38.2Z-2F5\n");
-			probe_run.status = PROBE_SECOND_STAR;
+			if(sys.state == State::Idle)
+			{
+				MKS_GRBL_CMD_SEND("G21 G91 G38.2 Z-2 F10\n");
+				probe_run.status = PROBE_SECOND_STAR;
+			}
+
 		break;
 
 		case PROBE_FITST_FAIL: 
@@ -738,15 +743,24 @@ void probe_check() {
 
 		case PROBE_SECODN_SUCCEED: 
 
-			MKS_GRBL_CMD_SEND("G21G91G38.2Z-30F100\n");
+			MKS_GRBL_CMD_SEND("G92 Z0\n");
 
-			MKS_GRBL_CMD_SEND("G0Z0.3\n");
-			MKS_GRBL_CMD_SEND("G38.2Z-2F15\n");
+			MKS_GRBL_CMD_SEND("G0 Z10\n");
 
-			common_pupup_info_del();
-			mks_draw_common_popup_info_com("Info", "Probe succeed!", " ", event_henadle_pupup_com);
-			probe_run.status = PROBE_NO;
-			probe_run.flag = 0;
+			probe_run.status = PROBE_MOVE_UP;
+
+		break;
+
+		case PROBE_MOVE_UP:
+
+			if(sys.state == State::Idle)
+			{
+				common_pupup_info_del();
+				mks_draw_common_popup_info_com("Info", "Probe succeed!", " ", event_henadle_pupup_com);
+				probe_run.status = PROBE_NO;
+				probe_run.flag = 0;
+			}
+
 		break;
 		
     	case PROBE_SECODN_FAIL:
