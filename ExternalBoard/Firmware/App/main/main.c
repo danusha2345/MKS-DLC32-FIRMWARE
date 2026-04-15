@@ -14,6 +14,8 @@
 
 #include "driver/uart.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 static const char *TAG = "usb_joy_uart";
 
 // ================= UART =================
@@ -45,18 +47,24 @@ static void uart_init_app(void)
     ));
 }
 
+uint8_t prev_report[128] = {0};
+uint16_t prev_report_len = 0;
+
 static void uart_send_report(const uint8_t *data, size_t len)
 {
-    char buf[128];
-    int pos = 0;
-
-    for (int i = 0; i < len; i++) {
-        pos += snprintf(buf + pos, sizeof(buf) - pos, "%02X ", data[i]);
+    if(len == prev_report_len && memcmp(prev_report, data, MIN(len, sizeof(prev_report))) == 0) 
+    {
+        // Если отчёт не изменился, не отправляем его повторно
+        return;
     }
 
-    buf[pos++] = '\n';
+    uint8_t header[4] = {0xA0, 0xB0, (len >> 8) & 0xFF, len & 0xFF};
 
-    uart_write_bytes(UART_PORT, buf, pos);
+    uart_write_bytes(UART_PORT, header, sizeof(header));
+    uart_write_bytes(UART_PORT, data, len);
+
+    memcpy(prev_report, data, MIN(len, sizeof(prev_report)));
+    prev_report_len = len;
 }
 
 // ================= APP QUEUE =================
