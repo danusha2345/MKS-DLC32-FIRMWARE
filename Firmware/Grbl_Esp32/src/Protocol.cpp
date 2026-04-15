@@ -28,6 +28,10 @@
 #include "mks/MKS_draw_print.h"
 #include "mks/MKS_draw_wifi.h"
 
+#ifdef ENABLE_MPR121_BUTTONS
+    #include "MPR121_Buttons.h"
+#endif
+
 static void protocol_exec_rt_suspend();
 
 static char    line[LINE_BUFFER_SIZE];     // Line to be executed. Zero-terminated.
@@ -78,8 +82,6 @@ Error add_char_to_line(char c, uint8_t client) {
     return Error::Ok;
 }
 
-bool is_sd_save_mode = false;
-
 Error execute_line(char* line, uint8_t client, WebUI::AuthenticationLevel auth_level) {
     Error result = Error::Ok;
     // Empty or comment line. For syncing purposes.
@@ -87,9 +89,6 @@ Error execute_line(char* line, uint8_t client, WebUI::AuthenticationLevel auth_l
         return Error::Ok;
     }
 
-    if(is_sd_save_mode)
-        return Error::Ok;
-    
     // Grbl '$' or WebUI '[ESPxxx]' system command
     if (line[0] == '$' || line[0] == '[') {
         return system_execute_line(line, client, auth_level);
@@ -271,6 +270,10 @@ void protocol_main_loop() {
         if (sys.abort) {
             return;  // Bail to main() program loop to reset system.
         }
+
+        #ifdef ENABLE_MPR121_BUTTONS
+            mpr121_buttons.handle();
+        #endif
         // check to see if we should disable the stepper drivers ... esp32 work around for disable in main loop.
         if (stepper_idle && stepper_idle_lock_time->get() != 0xff) {
             

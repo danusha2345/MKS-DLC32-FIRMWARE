@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build (IDF shell)",
+      "type": "shell",
+      "command": "cmd.exe",
+      "args": [
+        "/k",
+        "\"C:\\Espressif\\idf_cmd_init.bat\" esp-idf-462c4bada4b11129d026906c121c8d75 && cd /d ${workspaceFolder} && idf.py build"
+      ]
+    },
+    {
+      "label": "Upload (IDF shell)",
+      "type": "shell",
+      "command": "cmd.exe",
+      "args": [
+        "/k",
+        "\"C:\\Espressif\\idf_cmd_init.bat\" esp-idf-462c4bada4b11129d026906c121c8d75 && cd /d ${workspaceFolder} && idf.py upload"
+      ]
+    },
+    {
+      "label": "Monitor (IDF shell)",
+      "type": "shell",
+      "command": "cmd.exe",
+      "args": [
+        "/k",
+        "\"C:\\Espressif\\idf_cmd_init.bat\" esp-idf-462c4bada4b11129d026906c121c8d75 && cd /d ${workspaceFolder} && idf.py monitor"
+      ]
+    }
+  ]
+}

@@ -106,6 +106,15 @@ const int MAX_N_AXIS = 6;
 #    define WIFI_OR_BLUETOOTH
 #endif
 
+#define ENABLE_MPR121_BUTTONS
+
+#define IIC_SCL_PIN                   GPIO_NUM_25 //GPIO_NUM_4
+#define IIC_SDA_PIN                   GPIO_NUM_26 //GPIO_NUM_0
+
+#ifdef ENABLE_MPR121_BUTTONS
+    #define MPR121_IRQ_PIN                  GPIO_NUM_27
+#endif 
+
 #define ENABLE_HTTP                     /* enable HTTP and all related services              */                   
 #define ENABLE_OTA                      /* enable OTA                                        */
 #define ENABLE_TELNET                   /* enable telnet                                     */

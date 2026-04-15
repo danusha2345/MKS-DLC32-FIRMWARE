@@ -21,7 +21,6 @@
 */
 
 #include "../Config.h"
-#include <AsyncTCP.h>
 
 class WiFiServer;
 class WiFiClient;
@@ -53,10 +52,10 @@ namespace WebUI {
         ~Telnet_Server();
 
     private:
-        static AsyncServer* _telnetserver;
+        static WiFiServer* _telnetserver;
 
         bool        _setupdone;
-        AsyncClient*  _telnetClient;
+        WiFiClient  _telnetClient;
 
 #ifdef ENABLE_TELNET_WELCOME_MSG
         IPAddress _telnetClientIP;
@@ -70,16 +69,22 @@ namespace WebUI {
 
         uint8_t _client_index;
 
-    public:
-
         bool is_connected()
         {
-            return _telnetClient != NULL && _telnetClient->connected();
+            return _telnetClient.connected();
         }
 
-        void setup_client(AsyncClient* client);
-        void on_disconect(AsyncClient* client);
+        void setup_client(WiFiClient& client)
+        {
+            _telnetClientIP = IPAddress(0, 0, 0, 0);
 
+            if(_telnetClient.connected())
+                _telnetClient.stop();
+            
+            _telnetClient = client;
+        }
+
+    public:
         static void begin_all();
         static void handle_all();
         static void end_all();
@@ -90,8 +95,6 @@ namespace WebUI {
         static int get_rx_buffer_available(uint8_t client);
 
         static void _handle_clients();
-
-        static void _set_no_delay(uint8_t client, bool nodelay);
     };
     
     extern Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];

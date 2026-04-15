@@ -108,9 +108,9 @@
 #define LCD_MOSI				    GPIO_NUM_23
 #define LCD_RS					    GPIO_NUM_33
 #define LCD_EN					    GPIO_NUM_5     
-#define LCD_RST					    GPIO_NUM_27     
-#define LCD_CS					    GPIO_NUM_25
-#define TOUCH_CS				    GPIO_NUM_26
+#define LCD_RST					    -1 //GPIO_NUM_27     
+#define LCD_CS					    -1 //GPIO_NUM_25
+#define TOUCH_CS				    -1 //GPIO_NUM_26
 #define BEEPER					    I2SO(7)
 
 #define IIC_SCL                     GPIO_NUM_4

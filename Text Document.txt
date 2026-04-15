@@ -1,9 +1,0 @@
-1. $ESP444=RESTART
-2. $ESP115=ON  
-3. $ESP100=your_ssdi_name
-4. $ESP101=your_ssdi_password
-5. $ESP110=STA
-6. $ESP444=RESTART 
-7. $ESP115=ON
-
-ip = [ESP111] 

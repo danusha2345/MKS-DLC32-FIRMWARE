@@ -620,6 +620,11 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
         grbl_sendf(out->client(), "ping ok\r\n");
         return Error::Ok;
     }
+    else if (strcmp("RESTART", line + 1) == 0) 
+    {
+        esp_restart();while(true) {}
+        return Error::Ok;
+    }
     else if (strcmp("INFO", line + 1) == 0) 
     {
         print_esp_info(out->client());
@@ -668,7 +673,7 @@ Error system_execute_line(char* line, WebUI::ESPResponseStream* out, WebUI::Auth
         }
 
         grbl_sendf(out->client(), "AsyncClient::setNoDelay(%d)\r\n", (int)no_delay);
-        WebUI::Telnet_Server::_set_no_delay(out->client(), no_delay);
+        //WebUI::Telnet_Server::_set_no_delay(out->client(), no_delay);
         return Error::Ok;
     }
 #endif

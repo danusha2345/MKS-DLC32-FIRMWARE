@@ -19,6 +19,7 @@
 */
 
 #include "../Grbl.h"
+#include "../SDCard.h"
 
 #if defined(ENABLE_WIFI) && defined(ENABLE_TELNET)
 
@@ -31,7 +32,7 @@
 namespace WebUI {
     Telnet_Server telnet_server[TELNET_CLIENTS_TOTAL];
     uint16_t      Telnet_Server::_port         = 0;
-    AsyncServer*   Telnet_Server::_telnetserver = NULL;
+    WiFiServer*   Telnet_Server::_telnetserver = NULL;
 
     #ifdef ENABLE_TELNET_OTHER_TASK
         TaskHandle_t _telnet_task;
@@ -39,61 +40,6 @@ namespace WebUI {
 
     #define CLIENT_TELNET_INDEX(client) (client - CLIENT_TELNET_MIN)
     #define CLIENT_TELNET_VAL(i) (i + CLIENT_TELNET_MIN)
-
-    #define IS_VALID_TELNET_CLIENT_INDEX(i) (i >= 0 && i < TELNET_CLIENTS_TOTAL)
-
-    void telnet_handle_client(void *arg, AsyncClient *client) 
-    {
-        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
-        {
-            if (!telnet_server[i].is_connected()) 
-            {
-                telnet_server[i].setup_client(client);
-                break;
-            }
-        }
-    }
-
-    void Telnet_Server::setup_client(AsyncClient* client)
-    {
-        _telnetClientIP = IPAddress(0, 0, 0, 0);
-
-        _telnetClient = client;
-
-        client->onData([](void *arg, AsyncClient *client, void *data, size_t len) 
-        {
-            auto ptr = static_cast<Telnet_Server*>(arg);
-            static_cast<Telnet_Server*>(ptr)->push((uint8_t*)data, len);
-
-        }, this);
-
-        client->onDisconnect([](void * arg, AsyncClient *client) 
-        {
-            auto ptr = static_cast<Telnet_Server*>(arg);
-            ptr->on_disconect(client);
-
-        }, this);
-        
-        
-        grbl_sendf(CLIENT_ALL, "[MSG:TELNET Connected i:%d, IP:%s]\r\n", (int)_client_index,
-            _telnetClient->remoteIP().toString().c_str());
-    }
-
-    void Telnet_Server::on_disconect(AsyncClient* client)
-    {
-        _telnetClient = client;
-
-        grbl_sendf(CLIENT_ALL, "[MSG:TELNET Disconected i:%d]\r\n", (int)_client_index);
-    }
-
-    
-    void Telnet_Server::_set_no_delay(uint8_t client, bool nodelay)
-    {
-        uint8_t index = CLIENT_TELNET_INDEX(client);
-
-        if(IS_VALID_TELNET_CLIENT_INDEX(index))
-            telnet_server[index]._telnetClient->setNoDelay(nodelay);
-    }
 
     void Telnet_Server::begin_all()
     {
@@ -104,13 +50,11 @@ namespace WebUI {
         _port = telnet_port->get();
 
         //create instance
-        _telnetserver = new AsyncServer(_port);
-        _telnetserver->setNoDelay(0);
-        
+        _telnetserver = new WiFiServer(_port, TELNET_CLIENTS_TOTAL);
+
         String s = "[MSG:TELNET Started " + String(_port) + "]\r\n";
         grbl_send(CLIENT_ALL, (char*)s.c_str());
         //start telnet server
-        _telnetserver->onClient(&telnet_handle_client, nullptr);
         _telnetserver->begin();
 
         for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
@@ -147,15 +91,14 @@ namespace WebUI {
             }
         #endif
 
-        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
-            telnet_server[i].end();
-
         if (_telnetserver) 
         {
-            _telnetserver->end();
             delete _telnetserver;
             _telnetserver = NULL;
         }
+
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+            telnet_server[i].end();
     }
 
     void Telnet_Server::handle_all()
@@ -163,6 +106,33 @@ namespace WebUI {
         if(_telnetserver == NULL)
             return;
 
+        bool client_found = false;
+        
+        if (_telnetserver->hasClient()) 
+        {
+            for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+            {
+                //find free/disconnected spot
+                if (!telnet_server[i].is_connected()) 
+                {
+                    auto client = _telnetserver->available();
+
+                    telnet_server[i].setup_client(client);
+
+                    String s = "[MSG:TELNET Connected i:" + String(i) + "]\r\n";
+                    grbl_send(CLIENT_ALL, (char*)s.c_str());
+                    client_found = true;
+                    break;
+                }
+            }
+
+            if(!client_found)
+            {
+                _telnetserver->available().stop();
+                grbl_send(CLIENT_ALL, "[MSG:TELNET Clinet rejected");
+            }
+        }
+        
         #ifndef ENABLE_TELNET_OTHER_TASK
             _handle_clients();
         #endif
@@ -184,8 +154,8 @@ namespace WebUI {
         else
         {
             uint8_t index = CLIENT_TELNET_INDEX(client);
-
-            if(IS_VALID_TELNET_CLIENT_INDEX(index))
+            
+            if(index >= 0 && index < TELNET_CLIENTS_TOTAL)
                 telnet_server[index].write(buffer, size);
         }
     }
@@ -224,32 +194,23 @@ namespace WebUI {
         _RXbufferpos  = 0;
     }
 
-    bool Telnet_Server::begin() 
-    {
+    bool Telnet_Server::begin() {
+        end();
         _RXbufferSize = 0;
         _RXbufferpos  = 0;
         _setupdone = true;
         return true;
     }
 
-    void Telnet_Server::end() 
-    {
+    void Telnet_Server::end() {
         _setupdone    = false;
         _RXbufferSize = 0;
         _RXbufferpos  = 0;
-        
-        if(is_connected())
-            _telnetClient->close();
-
-        _telnetClient = NULL;
     }
 
-    size_t Telnet_Server::write(const uint8_t* buffer, size_t size) 
-    {
+    size_t Telnet_Server::write(const uint8_t* buffer, size_t size) {
         size_t wsize = 0;
-
-        if (!_setupdone) 
-        {
+        if (!_setupdone) {
             log_d("[TELNET out blocked]");
             return 0;
         }
@@ -259,8 +220,7 @@ namespace WebUI {
         if (is_connected())
         {
             //log_d("[TELNET out connected]");
-            wsize = _telnetClient->write((char*)buffer, size);
-            
+            wsize = _telnetClient.write(buffer, size);
             COMMANDS::wait(0);
         }
 
@@ -281,13 +241,43 @@ namespace WebUI {
         if (is_connected()) 
         {
 #    ifdef ENABLE_TELNET_WELCOME_MSG
-            if (_telnetClientIP != _telnetClient->remoteIP()) 
+            if (_telnetClientIP != _telnetClient.remoteIP()) 
             {
                 report_init_message(CLIENT_TELNET_VAL(_client_index));
-                _telnetClientIP = _telnetClient->remoteIP();
+                _telnetClientIP = _telnetClient.remoteIP();
             }
 #    endif
+            if (_telnetClient.available()) 
+            {
+                uint8_t buf[1024];
+                COMMANDS::wait(0);
+                int readlen  = _telnetClient.available();
+                int writelen = TELNETRXBUFFERSIZE - available();
+                if (readlen > 1024) {
+                    readlen = 1024;
+                }
+                if (readlen > writelen) {
+                    readlen = writelen;
+                }
+                if (readlen > 0) {
+                    _telnetClient.read(buf, readlen);
+                    push(buf, readlen);
+                }
+                return;
+            }
         } 
+        else 
+        {
+            if (_telnetClient) 
+            {
+#    ifdef ENABLE_TELNET_WELCOME_MSG
+                _telnetClientIP = IPAddress(0, 0, 0, 0);
+#    endif
+                _telnetClient.stop();
+            }
+        }
+            
+        COMMANDS::wait(0);
     }
 
     int Telnet_Server::peek(void) {
@@ -320,7 +310,62 @@ namespace WebUI {
         return false;
     }
 
-    bool Telnet_Server::push(const uint8_t* data, int data_size) {
+    uint8_t _line[1024];
+    bool _sd_write_mode = false;
+    uint16_t _line_pos = 0;
+    fs::File _sd_file;
+
+    bool Telnet_Server::push(const uint8_t* data, int data_size) 
+    {
+        /*
+        size_t offset = 0;
+        bool skip = false;
+
+        for(auto i = 0; i < data_size; i++)
+        {
+            uint8_t _char = data[i];
+
+            if(_char == '@')
+            {
+                if(_sd_write_mode)
+                {
+                    Uart0.println("SD WRITE OFF");
+                    _sd_write_mode = false;
+                    _line_pos = 0;
+                    offset = i;
+                    break;
+                }
+                else
+                {
+                    Uart0.println("SD WRITE ON");
+                    _sd_write_mode = true;
+                    _line_pos = 0;
+                    skip = true;
+                }
+            }
+            else if(_sd_write_mode)
+            {
+                Uart0.printf("%i\n", (int)_char);
+
+                _line[_line_pos++] = _char;
+
+                if(_char == '\n' || _char == '\r' || _char == '\0')
+                {
+                    write((uint8_t*)"ok", 3);
+                    _line_pos = 0;
+                }
+
+                if(_line_pos == sizeof(_line))
+                    _line_pos = 0;
+
+                skip = true;
+            }
+        }
+
+        if(skip)
+            return true;
+        */
+
         if ((data_size + _RXbufferSize) <= TELNETRXBUFFERSIZE) {
             int data_processed = 0;
             int current        = _RXbufferpos + _RXbufferSize;
