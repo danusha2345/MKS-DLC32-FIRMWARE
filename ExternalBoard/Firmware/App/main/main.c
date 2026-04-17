@@ -13,6 +13,7 @@
 #include "usb/hid_host.h"
 
 #include "driver/uart.h"
+#include "uart_cmd.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -54,15 +55,19 @@ static void uart_send_report(const uint8_t *data, size_t len)
 {
     if(len == prev_report_len && memcmp(prev_report, data, MIN(len, sizeof(prev_report))) == 0) 
     {
-        // Если отчёт не изменился, не отправляем его повторно
         return;
     }
 
-    uint8_t header[4] = {0xA0, 0xB0, (len >> 8) & 0xFF, len & 0xFF};
+    struct EB_UART_HEADER header;
 
-    uart_write_bytes(UART_PORT, header, sizeof(header));
+    header.cmd = EB_UART_CMD_INPUT;
+    header.length = len;
+
+    header.crc = eb_calculate_crc16(data, len);
+    
+    uart_write_bytes(UART_PORT, (uint8_t*)&header, sizeof(header));
     uart_write_bytes(UART_PORT, data, len);
-
+    
     memcpy(prev_report, data, MIN(len, sizeof(prev_report)));
     prev_report_len = len;
 }

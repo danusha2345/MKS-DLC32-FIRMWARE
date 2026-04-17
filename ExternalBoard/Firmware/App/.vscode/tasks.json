@@ -16,7 +16,7 @@
       "command": "cmd.exe",
       "args": [
         "/k",
-        "\"C:\\Espressif\\idf_cmd_init.bat\" esp-idf-462c4bada4b11129d026906c121c8d75 && cd /d ${workspaceFolder} && idf.py upload"
+        "\"C:\\Espressif\\idf_cmd_init.bat\" esp-idf-462c4bada4b11129d026906c121c8d75 && cd /d ${workspaceFolder} && idf.py flash"
       ]
     },
     {
