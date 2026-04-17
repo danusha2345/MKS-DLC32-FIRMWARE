@@ -28,8 +28,8 @@
 #include "mks/MKS_draw_print.h"
 #include "mks/MKS_draw_wifi.h"
 
-#ifdef ENABLE_MPR121_BUTTONS
-    #include "MPR121_Buttons.h"
+#ifdef ENABLE_EXTERNAL_BOARD
+    #include "ExternalBoard.h"
 #endif
 
 static void protocol_exec_rt_suspend();
@@ -271,8 +271,8 @@ void protocol_main_loop() {
             return;  // Bail to main() program loop to reset system.
         }
 
-        #ifdef ENABLE_MPR121_BUTTONS
-            mpr121_buttons.handle();
+        #ifdef ENABLE_EXTERNAL_BOARD
+            ext_board.handle();
         #endif
         // check to see if we should disable the stepper drivers ... esp32 work around for disable in main loop.
         if (stepper_idle && stepper_idle_lock_time->get() != 0xff) {

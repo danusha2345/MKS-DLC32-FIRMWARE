@@ -3,7 +3,89 @@
 #include <Adafruit_MPR121.h>
 #include "Config.h"
 #include "Grbl.h"
+#include "Uart.h"
 
+#include "../../../ExternalBoard/Firmware/App/main/uart_cmd.h"
+
+#define EXT_BOARD_LOG(str, ...) \
+    { \
+        char temp[128]; \
+        snprintf(temp, sizeof(temp), str, ##__VA_ARGS__); \
+        Uart0.printf("EXT BOARD: %s\n", temp); \
+    }
+
+class ExternalBoard
+{
+    Uart Uart1 = Uart(UART_NUM_1);
+
+    EB_UART_HEADER header;
+    uint8_t buffer[256];
+
+public:
+
+    void begin()
+    {
+        Uart1.setPins(EXT_BOARD_TX_PIN, EXT_BOARD_RX_PIN);
+        Uart1.begin(115200, Uart::Data::Bits8, Uart::Stop::Bits1, Uart::Parity::None);
+
+        header.length = 0;
+    }
+
+    void bytes_to_hex(const unsigned char *bytes, size_t len, char *output) 
+    {
+        for (size_t i = 0; i < len; i++) {
+            // Writes two hex digits for each byte
+            sprintf(output + (i * 2), "%02x", bytes[i]);
+        }
+        output[len * 2] = '\0'; // Null-terminate the string
+    }
+
+    void handle()
+    {
+        if(header.length == 0)
+        {
+            if(Uart1.available() >= sizeof(header))
+            {
+                Uart1.readBytes((uint8_t*)&header, sizeof(header), 0);
+                
+                EXT_BOARD_LOG("header: magic=%X cmd=%X, len=%i, crc=%X",
+                    (int)header.magic,
+                    (int)header.cmd,
+                    (int)header.length, 
+                    (int)header.crc);
+            }
+        }
+        else
+        {
+            if(Uart1.available() >= header.length)
+            {
+                Uart1.readBytes((uint8_t*)buffer, header.length, 0);
+                uint16_t crc = eb_calculate_crc16(buffer, header.length);
+                
+                if(header.crc == crc)
+                {
+                    EXT_BOARD_LOG("data readed");
+
+                    char hex_str[512];
+
+                    bytes_to_hex(buffer, header.length, hex_str);
+
+                    EXT_BOARD_LOG("data: %s", hex_str);
+                }
+                else
+                {
+                    EXT_BOARD_LOG("header crc: %X != %X", (int)header.crc, (int)crc);
+                }
+
+                header.length = 0;
+            }
+        }
+    }
+};
+
+extern ExternalBoard ext_board;
+
+/*
 class MPR121_Buttons;
 
 extern MPR121_Buttons mpr121_buttons;
@@ -341,4 +423,4 @@ mpr121_write(0x5E, 0x0C);
     }
 
 
-};
+};*/

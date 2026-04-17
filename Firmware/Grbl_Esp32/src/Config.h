@@ -106,14 +106,16 @@ const int MAX_N_AXIS = 6;
 #    define WIFI_OR_BLUETOOTH
 #endif
 
-#define ENABLE_MPR121_BUTTONS
+#define ENABLE_EXTERNAL_BOARD                /* enable support for external board         */
+#define EXT_BOARD_TEST
 
-#define IIC_SCL_PIN                   GPIO_NUM_25 //GPIO_NUM_4
-#define IIC_SDA_PIN                   GPIO_NUM_26 //GPIO_NUM_0
-
-#ifdef ENABLE_MPR121_BUTTONS
-    #define MPR121_IRQ_PIN                  GPIO_NUM_27
-#endif 
+#ifdef EXT_BOARD_TEST
+    #define EXT_BOARD_RX_PIN			GPIO_NUM_18
+    #define EXT_BOARD_TX_PIN			GPIO_NUM_19
+#else
+    #define EXT_BOARD_RX_PIN            GPIO_NUM_4
+    #define EXT_BOARD_TX_PIN            GPIO_NUM_0
+#endif
 
 #define ENABLE_HTTP                     /* enable HTTP and all related services              */                   
 #define ENABLE_OTA                      /* enable OTA                                        */

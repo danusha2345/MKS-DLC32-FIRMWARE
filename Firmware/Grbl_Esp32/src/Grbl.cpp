@@ -27,9 +27,9 @@
 #include "mks/MKS_ctrl.h"
 #include "mks/MKS_SDCard.h"
 
-#ifdef ENABLE_MPR121_BUTTONS
-    #include "MPR121_Buttons.h"
-    MPR121_Buttons mpr121_buttons;
+#ifdef ENABLE_EXTERNAL_BOARD
+    #include "ExternalBoard.h"
+    ExternalBoard ext_board;
 #endif
 
 void grbl_init() {
@@ -70,9 +70,9 @@ void grbl_init() {
     sys_position_changed = false;
     memset(sys_position, 0, sizeof(sys_position));  // Clear machine position.
     machine_init();                                 // weak definition in Grbl.cpp does nothing
-
-    #ifdef ENABLE_MPR121_BUTTONS
-        mpr121_buttons.begin();
+    
+    #ifdef ENABLE_EXTERNAL_BOARD
+        ext_board.begin();
     #endif
 
     // Initialize system state.
