@@ -5,82 +5,118 @@
 #include "Grbl.h"
 #include "Uart.h"
 
-#include "../../../ExternalBoard/Firmware/App/main/uart_cmd.h"
+extern Uart ext_board_uart;
 
-#define EXT_BOARD_LOG(str, ...) \
-    { \
-        char temp[128]; \
-        snprintf(temp, sizeof(temp), str, ##__VA_ARGS__); \
-        Uart0.printf("EXT BOARD: %s\n", temp); \
-    }
+#define EXT_BOARD_LOG(str, ...) { \
+    char temp[128]; \
+    snprintf(temp, sizeof(temp), str, ##__VA_ARGS__); \
+    Uart0.printf("EXT BOARD: %s\n", temp); }
 
 class ExternalBoard
 {
-    Uart Uart1 = Uart(UART_NUM_1);
+    uint8_t data[64];
+    size_t data_readed;
 
-    EB_UART_HEADER header;
-    uint8_t buffer[256];
+    enum class JOYSTICK_BUTTON
+    {
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN,
+
+        L,
+        R,
+
+        A,
+        B,
+        X,
+        Y
+    };
+
+    #pragma pack(push, 1)
+        struct JoystickReport
+        {
+            uint8_t report_id;
+
+            int8_t x1;
+            int8_t y1;
+
+            int8_t rz1;
+
+            int8_t x2;
+            int8_t y2;
+
+            int8_t rz2;
+
+            uint8_t buttons1;
+            uint8_t buttons2;
+
+            bool is_pressed(JOYSTICK_BUTTON btn) const
+            {
+                switch(btn)
+                {
+                    case JOYSTICK_BUTTON::LEFT:
+                        return buttons1 & 0x01;
+                    case JOYSTICK_BUTTON::RIGHT:
+                        return buttons1 & 0x02;
+                    case JOYSTICK_BUTTON::UP:
+                        return buttons1 & 0x04;
+                    case JOYSTICK_BUTTON::DOWN:
+                        return buttons1 & 0x08;
+                    case JOYSTICK_BUTTON::L:
+                        return buttons1 & 0x10;
+                    case JOYSTICK_BUTTON::R:
+                        return buttons1 & 0x20;
+                    case JOYSTICK_BUTTON::A:
+                        return buttons2 & 0x01;
+                    case JOYSTICK_BUTTON::B:
+                        return buttons2 & 0x02;
+                    case JOYSTICK_BUTTON::X:
+                        return buttons2 & 0x04;
+                    case JOYSTICK_BUTTON::Y:
+                        return buttons2 & 0x08;
+                    
+                    default:
+                        return false;
+                }
+            }
+        };
+    #pragma pack(pop)
+
+    enum class BUTTON : uint8_t
+    {
+        X_INC = JOYSTICK_BUTTON::RIGHT,
+        X_DEC = JOYSTICK_BUTTON::LEFT,
+
+        Y_INC = JOYSTICK_BUTTON::UP,
+        Y_DEC = JOYSTICK_BUTTON::DOWN,
+
+        Z_INC = JOYSTICK_BUTTON::L,
+        Z_DEC = JOYSTICK_BUTTON::R,
+
+
+        RESET = 8,
+        HOME = 7,
+        ZERO = 4,
+
+        MODE_CHANGE = 1,
+        FEED_CHANGE = 9,
+        PROBE = 0,
+
+        ButtonMax = 12
+    };
 
 public:
 
     void begin()
     {
-        Uart1.setPins(EXT_BOARD_TX_PIN, EXT_BOARD_RX_PIN);
-        Uart1.begin(115200, Uart::Data::Bits8, Uart::Stop::Bits1, Uart::Parity::None);
-
-        header.length = 0;
+        ext_board_uart.setPins(EXT_BOARD_TX_PIN, EXT_BOARD_RX_PIN);
+        ext_board_uart.begin(115200, Uart::Data::Bits8, Uart::Stop::Bits1, Uart::Parity::None);
     }
 
-    void bytes_to_hex(const unsigned char *bytes, size_t len, char *output) 
-    {
-        for (size_t i = 0; i < len; i++) {
-            // Writes two hex digits for each byte
-            sprintf(output + (i * 2), "%02x", bytes[i]);
-        }
-        output[len * 2] = '\0'; // Null-terminate the string
-    }
+    void handle();
 
-    void handle()
-    {
-        if(header.length == 0)
-        {
-            if(Uart1.available() >= sizeof(header))
-            {
-                Uart1.readBytes((uint8_t*)&header, sizeof(header), 0);
-                
-                EXT_BOARD_LOG("header: magic=%X cmd=%X, len=%i, crc=%X",
-                    (int)header.magic,
-                    (int)header.cmd,
-                    (int)header.length, 
-                    (int)header.crc);
-            }
-        }
-        else
-        {
-            if(Uart1.available() >= header.length)
-            {
-                Uart1.readBytes((uint8_t*)buffer, header.length, 0);
-                uint16_t crc = eb_calculate_crc16(buffer, header.length);
-                
-                if(header.crc == crc)
-                {
-                    EXT_BOARD_LOG("data readed");
-
-                    char hex_str[512];
-
-                    bytes_to_hex(buffer, header.length, hex_str);
-
-                    EXT_BOARD_LOG("data: %s", hex_str);
-                }
-                else
-                {
-                    EXT_BOARD_LOG("header crc: %X != %X", (int)header.crc, (int)crc);
-                }
-
-                header.length = 0;
-            }
-        }
-    }
+    void on_joystick(const JoystickReport* report);
 };
 
 extern ExternalBoard ext_board;

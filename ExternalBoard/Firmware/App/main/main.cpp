@@ -26,6 +26,8 @@ static const char *TAG = "usb_joy_uart";
 #define UART_BAUD_RATE  115200
 #define UART_BUF_SIZE   1024
 
+EB_UART_CMD uart_cmd;
+
 static void uart_init_app(void)
 {
     const uart_config_t cfg = {
@@ -51,19 +53,6 @@ static void uart_init_app(void)
 uint8_t prev_report[128] = {0};
 uint16_t prev_report_len = 0;
 
-static void uart_send_send_cmd(enum EB_UART_CMD cmd)
-{
-    struct EB_UART_HEADER header;
-
-    header.magic = EB_UART_HEADER_MAGIC;
-
-    header.cmd = cmd;
-    header.length = 0;
-    header.crc = 0xFFFF;
-    
-    uart_write_bytes(UART_PORT, (uint8_t*)&header, sizeof(header));
-}
-
 static void uart_send_report(const uint8_t *data, size_t len)
 {
     if(len == prev_report_len && memcmp(prev_report, data, MIN(len, sizeof(prev_report))) == 0) 
@@ -71,16 +60,7 @@ static void uart_send_report(const uint8_t *data, size_t len)
         return;
     }
 
-    struct EB_UART_HEADER header;
-
-    header.magic = EB_UART_HEADER_MAGIC;
-    header.cmd = EB_UART_CMD_INPUT;
-    header.length = len;
-
-    header.crc = eb_calculate_crc16(data, len);
-    
-    uart_write_bytes(UART_PORT, (uint8_t*)&header, sizeof(header));
-    uart_write_bytes(UART_PORT, data, len);
+    uart_cmd.send_cmd(EB_UART_CMD::CMD_INPUT, data, len);
     
     memcpy(prev_report, data, MIN(len, sizeof(prev_report)));
     prev_report_len = len;
@@ -169,7 +149,7 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
                      dev_params.sub_class);
             
             ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
-            uart_send_send_cmd(EB_UART_CMD_INPUT_DISCONNECTED);
+            uart_cmd.send_cmd(EB_UART_CMD::CMD_INPUT_DISCONNECTED);
             break;
 
         case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
@@ -177,7 +157,7 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
                      "HID transfer error, proto=%d subclass=%d",
                      dev_params.proto,
                      dev_params.sub_class);
-            uart_send_send_cmd(EB_UART_CMD_INPUT_ERROR);
+            uart_cmd.send_cmd(EB_UART_CMD::CMD_INPUT_ERROR);
             break;
 
         default:
@@ -216,7 +196,7 @@ static void hid_host_device_event(hid_host_device_handle_t hid_device_handle,
             }
 
             ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
-            uart_send_send_cmd(EB_UART_CMD_INPUT_CONNECTED);
+            uart_cmd.send_cmd(EB_UART_CMD::CMD_INPUT_CONNECTED);
             break;
         }
 
@@ -245,7 +225,7 @@ static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
 }
 
 // ================= MAIN =================
-void app_main(void)
+extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "Start USB HID -> UART");
 
