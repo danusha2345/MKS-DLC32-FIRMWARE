@@ -1,0 +1,110 @@
+(footprint "StepDown"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -0.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "e895090a-9c6a-441c-8105-7c41346d05da")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "StepDown"
+		(at 0 1 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "0ee63f4b-5633-44be-ac3e-37cb3ffdf033")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "33a3ec12-bee2-46de-8866-d5bc16cd9bc5")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "b4fdfc3b-fce0-48a6-8408-3885ac35d3fd")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -10 -5)
+		(end 7.5 7.5)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "34a719d1-fd34-46a3-a964-ba2f83fff89a")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 2.5 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "3091511c-dfc7-4318-8d26-998180b9de9b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "GND" smd roundrect
+		(at -10.5 -2)
+		(size 5 4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.15)
+		(uuid "0b7a0ff1-aefe-4a6e-9b52-8993fa103e2a")
+	)
+	(pad "GND" smd roundrect
+		(at 8 -2)
+		(size 5 4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.15)
+		(uuid "94c2d053-6d61-4121-aaf3-f68a9f065ef2")
+	)
+	(pad "IN" smd roundrect
+		(at -10.5 4.5)
+		(size 5 4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.15)
+		(uuid "66f66e6d-0689-4e9d-a866-64d4443387b7")
+	)
+	(pad "OUT" smd roundrect
+		(at 8 4.5)
+		(size 5 4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.15)
+		(uuid "1b195cb0-b071-4a86-81ab-e580b57cddad")
+	)
+	(embedded_fonts no)
+)
