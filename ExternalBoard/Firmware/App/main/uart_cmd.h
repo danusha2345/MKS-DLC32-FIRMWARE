@@ -82,7 +82,7 @@ struct EB_UART_CMD
     READ_RESULT read_cmd();
 };
 
-READ_RESULT EB_UART_CMD::read_cmd()
+EB_UART_CMD::READ_RESULT EB_UART_CMD::read_cmd()
 {
     crc_t crc;
     magic_t magic;

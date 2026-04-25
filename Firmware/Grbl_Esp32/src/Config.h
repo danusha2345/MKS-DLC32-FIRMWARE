@@ -107,7 +107,7 @@ const int MAX_N_AXIS = 6;
 #endif
 
 #define ENABLE_EXTERNAL_BOARD                /* enable support for external board         */
-#define EXT_BOARD_TEST
+//#define EXT_BOARD_TEST
 
 #ifdef EXT_BOARD_TEST
     #define EXT_BOARD_RX_PIN			GPIO_NUM_18

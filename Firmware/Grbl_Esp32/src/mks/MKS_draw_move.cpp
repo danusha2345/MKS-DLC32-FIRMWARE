@@ -254,7 +254,7 @@ static void set_xyz_pos(lv_obj_t* obj, lv_event_t event) {
 	}
 }
 
-static void set_knife() {
+void set_knife1() {
 
 	if(probe_invert->get()) {
 		MKS_GRBL_CMD_SEND("G21 G91 G38.2 Z-50 F200\n");
@@ -382,7 +382,7 @@ static void event_handler(lv_obj_t* obj, lv_event_t event) {
 		case ID_M_CNC_SET:	set_cnc_ctrl();		break;
 		// case ID_L_NEXT	:	disp_imgbtn_1_del(); disp_imgbtn_2(); break;
 		// case ID_L_UP	: 	disp_imgbtn_2_del();  disp_imgbtn_1(); break;
-		case ID_M_KNIFE: set_knife(); break;
+		case ID_M_KNIFE: set_knife1(); break;
 		// case ID_M_COOLING: set_cooling();  break;
 	}
 }

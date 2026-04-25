@@ -17,106 +17,194 @@ class ExternalBoard
     uint8_t data[64];
     size_t data_readed;
 
-    enum class JOYSTICK_BUTTON
+    enum class ButtonEvent
     {
-        LEFT,
-        RIGHT,
-        UP,
-        DOWN,
-
-        L,
-        R,
-
-        A,
-        B,
-        X,
-        Y
+        Click,
+        LongPress
     };
 
-    #pragma pack(push, 1)
-        struct JoystickReport
+    using button_event_t = std::function<void(ButtonEvent, uint32_t)>;
+    
+    struct Button
+    {
+        bool state;
+        bool prev_state;
+        bool flag;
+
+        uint8_t click_count = 0;
+        uint32_t last_press_time_ms = 0;
+        uint32_t last_click_time_ms = 0;
+
+        bool long_press_fired = false;
+        button_event_t on_event = nullptr;
+
+        uint32_t long_press_time_ms = 1000;
+    };
+
+    enum JoystickButton : uint32_t
+    {
+        JOYSTICK_LEFT,
+        JOYSTICK_RIGHT,
+        JOYSTICK_UP,
+        JOYSTICK_DOWN,
+
+        JOYSTICK_START,
+        JOYSTICK_SELECT,
+
+        JOYSTICK_L,
+        JOYSTICK_R,
+
+        JOYSTICK_A,
+        JOYSTICK_B,
+        JOYSTICK_X,
+        JOYSTICK_Y,
+
+        JOYSTICK_BUTTON_MAX
+    };
+
+    Button buttons[JOYSTICK_BUTTON_MAX];
+
+    static const uint32_t press_click_delay = 500;
+    static const uint32_t double_click_delay = 500;
+    
+    struct __attribute__((packed)) JoystickReport
+    {
+        uint8_t x; // 0-255, 128 is center
+        uint8_t y; // 0-255, 128 is center
+
+        uint8_t unused1, unused2, unused3;
+
+        uint8_t buttons1;// x=0x10 a=0x20 b=0x40 y=0x80
+        uint8_t buttons2;// START=0x20 SELECT=0x10 L=0x01 R=0x02
+
+        void get_buttons(Button* buttons)
         {
-            uint8_t report_id;
-
-            int8_t x1;
-            int8_t y1;
-
-            int8_t rz1;
-
-            int8_t x2;
-            int8_t y2;
-
-            int8_t rz2;
-
-            uint8_t buttons1;
-            uint8_t buttons2;
-
-            bool is_pressed(JOYSTICK_BUTTON btn) const
+            for(auto i = 0; i < JOYSTICK_BUTTON_MAX; i++)
             {
-                switch(btn)
-                {
-                    case JOYSTICK_BUTTON::LEFT:
-                        return buttons1 & 0x01;
-                    case JOYSTICK_BUTTON::RIGHT:
-                        return buttons1 & 0x02;
-                    case JOYSTICK_BUTTON::UP:
-                        return buttons1 & 0x04;
-                    case JOYSTICK_BUTTON::DOWN:
-                        return buttons1 & 0x08;
-                    case JOYSTICK_BUTTON::L:
-                        return buttons1 & 0x10;
-                    case JOYSTICK_BUTTON::R:
-                        return buttons1 & 0x20;
-                    case JOYSTICK_BUTTON::A:
-                        return buttons2 & 0x01;
-                    case JOYSTICK_BUTTON::B:
-                        return buttons2 & 0x02;
-                    case JOYSTICK_BUTTON::X:
-                        return buttons2 & 0x04;
-                    case JOYSTICK_BUTTON::Y:
-                        return buttons2 & 0x08;
-                    
-                    default:
-                        return false;
-                }
+                buttons[i].prev_state = buttons[i].state;
+                buttons[i].state = false;
+                buttons[i].flag = false;
             }
-        };
-    #pragma pack(pop)
 
-    enum class BUTTON : uint8_t
-    {
-        X_INC = JOYSTICK_BUTTON::RIGHT,
-        X_DEC = JOYSTICK_BUTTON::LEFT,
+            if(x < 0x7)
+                buttons[JOYSTICK_LEFT].state = true;
+            
+            if(x > 0x7F)
+                buttons[JOYSTICK_RIGHT].state = true;
 
-        Y_INC = JOYSTICK_BUTTON::UP,
-        Y_DEC = JOYSTICK_BUTTON::DOWN,
+            if(y < 0x7F)
+                buttons[JOYSTICK_UP].state = true;
 
-        Z_INC = JOYSTICK_BUTTON::L,
-        Z_DEC = JOYSTICK_BUTTON::R,
+            if(y > 0x7F)
+                buttons[JOYSTICK_DOWN].state = true;
 
+            if(buttons2 & 0x01)
+                buttons[JOYSTICK_L].state = true;
 
-        RESET = 8,
-        HOME = 7,
-        ZERO = 4,
+            if(buttons2 & 0x02)                    
+                buttons[JOYSTICK_R].state = true;
 
-        MODE_CHANGE = 1,
-        FEED_CHANGE = 9,
-        PROBE = 0,
+            if(buttons2 & 0x10)
+                buttons[JOYSTICK_SELECT].state = true;
 
-        ButtonMax = 12
+            if(buttons2 & 0x20)
+                buttons[JOYSTICK_START].state = true;
+
+            if(buttons1 & 0x20)
+                buttons[JOYSTICK_A].state = true;
+
+            if(buttons1 & 0x40)
+                buttons[JOYSTICK_B].state = true;
+
+            if(buttons1 & 0x10)
+                buttons[JOYSTICK_X].state = true;
+
+            if(buttons1 & 0x80)
+                buttons[JOYSTICK_Y].state = true;
+        }
     };
+
+    enum class MoveMode : uint32_t
+    {
+        mm_0_1 = 10,
+        mm_1_0 = 100,
+        mm_10_0 = 1000,
+        Jog = 50000
+
+    } move_mode = MoveMode::mm_1_0;
+
+    bool is_pressed(JoystickButton btn)
+    {
+        return buttons[btn].state;
+    }
+
+    bool is_released(JoystickButton btn)
+    {
+        return !buttons[btn].state;
+    }
+
+    bool is_new_pressed(JoystickButton btn)
+    {
+        return buttons[btn].state && !buttons[btn].prev_state;
+    }
+
+    bool is_new_released(JoystickButton btn)
+    {
+        return !buttons[btn].state && buttons[btn].prev_state;
+    }
+
+    bool is_changed(JoystickButton btn)
+    {
+        return buttons[btn].state != buttons[btn].prev_state;
+    }
+
+    bool is_click_and_reset(JoystickButton btn, uint8_t click_count)
+    {
+        if(buttons[btn].click_count == click_count)
+        {
+            buttons[btn].last_press_time_ms = 0;
+            buttons[btn].last_click_time_ms = 0;
+            buttons[btn].click_count = 0;
+            return true;
+        }
+
+        return false;
+    }
+
+    static const JoystickButton X_INC = JOYSTICK_RIGHT;
+    static const JoystickButton X_DEC = JOYSTICK_LEFT;
+    static const JoystickButton Y_INC = JOYSTICK_UP;
+    static const JoystickButton Y_DEC = JOYSTICK_DOWN;
+    static const JoystickButton Z_INC = JOYSTICK_X;
+    static const JoystickButton Z_DEC = JOYSTICK_Y;
+    
+    static const JoystickButton RESET = JOYSTICK_START;
+    static const JoystickButton PROBE = JOYSTICK_SELECT;
+    static const JoystickButton HOME = JOYSTICK_B;
+    static const JoystickButton ZERO = JOYSTICK_A;
+
+    struct AxisMove
+    {
+        int8_t x;
+        int8_t y;
+        int8_t z;
+    };
+
+    void get_axis(AxisMove& move);
+
+    void send_gcode(const char* gcode)
+    {
+        serila_write_into_buffer((uint8_t*)gcode);
+    }
 
 public:
 
-    void begin()
-    {
-        ext_board_uart.setPins(EXT_BOARD_TX_PIN, EXT_BOARD_RX_PIN);
-        ext_board_uart.begin(115200, Uart::Data::Bits8, Uart::Stop::Bits1, Uart::Parity::None);
-    }
+    void begin();
 
     void handle();
 
-    void on_joystick(const JoystickReport* report);
+    void on_joystick();
+    void probe_check_tick();
 };
 
 extern ExternalBoard ext_board;
