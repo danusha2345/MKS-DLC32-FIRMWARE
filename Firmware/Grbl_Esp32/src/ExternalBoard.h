@@ -62,6 +62,24 @@ class ExternalBoard
         JOYSTICK_BUTTON_MAX
     };
 
+    uint32_t beep_end_ms = 0;
+
+    inline void beep(bool on)
+    {
+        #ifdef USE_BEEP_LEDC
+            ledcWrite(BEEP_LEDC_CHANNEL, on ? 50 : 0);
+        #else
+            digitalWrite(BEEPER, on ? HIGH : LOW);
+        #endif
+    }
+
+    void beep_time(uint32_t time_ms)
+    {
+        beep_end_ms = millis() + time_ms;
+
+        beep(true);
+    }
+
     Button buttons[JOYSTICK_BUTTON_MAX];
 
     static const uint32_t press_click_delay = 500;

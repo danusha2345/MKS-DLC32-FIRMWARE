@@ -75,6 +75,7 @@ void ExternalBoard::on_joystick()
 
             char cancel[] = {0x85, 0};
             send_gcode(cancel);
+            delay(200);
         }
     }
     else
@@ -83,6 +84,7 @@ void ExternalBoard::on_joystick()
         {
             char cancel[] = {0x85, 0};
             send_gcode(cancel);
+            delay(200);
         }
 
         if(ANY_MOVE_BUTTONS(is_new_pressed))
@@ -118,6 +120,7 @@ void ExternalBoard::on_joystick()
     {
         mc_reset();
         EXT_BOARD_LOG("RESET");
+        beep_time(200);
     }
 
 }
@@ -135,6 +138,7 @@ void ExternalBoard::begin()
         {
             send_gcode("G92 X0 Y0 Z0\n");
             EXT_BOARD_LOG("ZERO");
+            beep_time(200);
         }
     };
 
@@ -146,6 +150,7 @@ void ExternalBoard::begin()
         {
             send_gcode("G28\n");
             EXT_BOARD_LOG("HOME");
+            beep_time(200);
         }
     };
 
@@ -156,6 +161,8 @@ void ExternalBoard::begin()
         set_knife1();
 
         EXT_BOARD_LOG("PROBE %d : %d", event, click_count);
+
+        beep_time(200);
     };
 }
 
@@ -254,5 +261,11 @@ void ExternalBoard::handle()
                 button->click_count = 0;
             }
         }
+    }
+
+    if(beep_end_ms && millis() > beep_end_ms)
+    {
+        beep(false);
+        beep_end_ms = 0;
     }
 }

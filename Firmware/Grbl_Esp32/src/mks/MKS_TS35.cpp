@@ -15,16 +15,28 @@ void tft_TS35_init() {
 }   
 
 void ts35_beep_init() { 
-    pinMode(BEEPER, OUTPUT);
-    digitalWrite(BEEPER, LOW);
+    #ifdef USE_BEEP_LEDC
+        ledcSetup(BEEP_LEDC_CHANNEL, 5000, 8);
+        ledcAttachPin(BEEPER, BEEP_LEDC_CHANNEL);
+        ledcWrite(BEEP_LEDC_CHANNEL, 0);
+    #else
+        pinMode(BEEPER, OUTPUT);
+        digitalWrite(BEEPER, LOW);
+    #endif
 }
 
-void ts35_beep_on(void) {
-    if(beep_status->get()) digitalWrite(BEEPER, HIGH);
+void ts35_beep_on(void) 
+{
+    #ifndef USE_BEEP_LEDC
+        if(beep_status->get()) digitalWrite(BEEPER, HIGH);
+    #endif
 }
 
-void ts35_beep_off(void) {
-    digitalWrite(BEEPER, LOW);
+void ts35_beep_off(void) 
+{
+    #ifndef USE_BEEP_LEDC
+        digitalWrite(BEEPER, LOW);
+    #endif
 }
 
 uint32_t ts35_beep_off_time = 0;

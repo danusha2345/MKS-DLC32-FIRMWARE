@@ -117,6 +117,9 @@ const int MAX_N_AXIS = 6;
     #define EXT_BOARD_TX_PIN            GPIO_NUM_0
 #endif
 
+#define USE_BEEP_LEDC
+#define BEEP_LEDC_CHANNEL 1
+
 #define ENABLE_HTTP                     /* enable HTTP and all related services              */                   
 #define ENABLE_OTA                      /* enable OTA                                        */
 #define ENABLE_TELNET                   /* enable telnet                                     */
