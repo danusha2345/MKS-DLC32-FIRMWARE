@@ -194,23 +194,13 @@ void clientCheckTask(void* pvParameters) {
             if (is_realtime_command(data)) {
                 execute_realtime_command(static_cast<Cmd>(data), client);
             } else {
-#if defined(ENABLE_SD_CARD)
-                if (get_sd_state(false) < SDState::Busy) {
-#endif  //ENABLE_SD_CARD
+                    // Символы буферизуем всегда (в т.ч. во время SD-задания). Решение,
+                    // выполнять ли строку со второго интерфейса при активной SD-печати,
+                    // принимается на уровне готовой строки в Protocol.cpp
+                    // (line_safe_during_sd_job): read-only запросы проходят, движение — нет.
                     vTaskEnterCritical(&myMutex);
                     client_buffer[client].write(data);
                     vTaskExitCritical(&myMutex);
-#if defined(ENABLE_SD_CARD)
-                } else {
-                    if (data == '\r' || data == '\n') {
-                        grbl_sendf(client, "error %d\r\n", Error::AnotherInterfaceBusy);
-                        grbl_msg_sendf(client, MsgLevel::Info, "SD card job running");
-                        if(sys.state == State::Idle) {
-                            set_sd_state(SDState::Idle);
-                        }
-                    }
-                }
-#endif  //ENABLE_SD_CARD
             }
         }  // if something available
         WebUI::COMMANDS::handle();

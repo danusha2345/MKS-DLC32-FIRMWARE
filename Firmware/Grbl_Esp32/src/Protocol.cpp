@@ -32,6 +32,8 @@
     #include "ExternalBoard.h"
 #endif
 
+#include "SDJobPolicy.h"
+
 static void protocol_exec_rt_suspend();
 
 static char    line[LINE_BUFFER_SIZE];     // Line to be executed. Zero-terminated.
@@ -248,6 +250,16 @@ void protocol_main_loop() {
                         line = client_lines[client].buffer;
 #ifdef REPORT_ECHO_RAW_LINE_RECEIVED
                         report_echo_line_received(line, client);
+#endif
+#ifdef ENABLE_SD_CARD
+                        // Пока с SD идёт задание, со второго интерфейса (USB/сеть) пропускаем
+                        // только read-only запросы состояния — движение/исполнение отклоняем,
+                        // чтобы не смешать два потока G-кода в одном планировщике.
+                        if (get_sd_state(false) >= SDState::Busy && !line_safe_during_sd_job(line)) {
+                            report_status_message(Error::AnotherInterfaceBusy, client);
+                            empty_line(client);
+                            break;
+                        }
 #endif
                         // auth_level can be upgraded by supplying a password on the command line
                         report_status_message(execute_line(line, client, WebUI::AuthenticationLevel::LEVEL_GUEST), client);
