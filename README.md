@@ -1,19 +1,83 @@
-# MKS-DLC32-FIRMWARE
-The source code of MKS DLC32.
+# MKS-DLC32-FIRMWARE — CNC-форк
 
-## Environment construction:
+Прошивка контроллера **MKS DLC32 v2.1** (ESP32) для ЧПУ-станка со шпинделем.
+Форк ветки `MKS-DLC32-NEW-CNC` от [IDLEVEL/MKS-DLC32-FIRMWARE](https://github.com/IDLEVEL/MKS-DLC32-FIRMWARE),
+которая, в свою очередь, основана на брошенной официальной прошивке
+[makerbase-mks/MKS-DLC32-FIRMWARE](https://github.com/makerbase-mks/MKS-DLC32-FIRMWARE)
+(движок Grbl_ESP32 v1.1).
 
-- vscode
+Зачем форк: оригинал makerbase заброшен (последний коммит — январь 2023),
+исходники свежее V2.1 не публикуются. IDLEVEL добавил CNC-функции (OTA, выносной
+пульт, переписанный Telnet), но его ветка не собиралась на Linux и тащила железо,
+которого нет на стоковой плате. Этот форк это чинит и причёсывает под обычную DLC32 v2.1.
 
-- platformIO
+Подробный технический разбор и план доработок — в [`docs/FORK_NOTES.md`](docs/FORK_NOTES.md).
 
-PlatformIOc needs to be installed on vscode.
+## Целевое железо
 
-Open Firmware with vscode, and platformIO will be started, In the platform.ini file，
+- Плата: **MKS DLC32 v2.1** (ESP32-WROOM, степперы через I2S-сдвиговые регистры).
+- Экран: штатный тач **MKS TS35 (3.5")** — рисуется через LVGL.
+- Назначение: **ЧПУ-фрезер** (3 оси XYZ, шпиндель с PWM).
 
-`default_envs = mks_dlc32_v2_1` 
+Карта пинов под эту плату задаётся в `Firmware/Grbl_Esp32/src/Machines/i2s_out_xyz_mks_dlc32.h`
+(флаги `USE_BOARD_V2_0` + `USR_Z_MOTOR` включены):
 
-Note:We will make a pin suitable for V1.0，Settings corresponding to the selection of coreXY.
+| Функция | Пин |
+|---|---|
+| Шпиндель/лазер PWM | GPIO32 |
+| Probe | GPIO22 |
+| Концевики X / Y / Z | GPIO36 / GPIO35 / GPIO34 |
+| Степперы X/Y/Z | I2S (BCK16 / WS17 / DATA21) |
+| TFT TS35 (SPI) | SCK18, MISO19, MOSI23, CS25, RS33, RST27, EN5, TouchCS26 |
 
-Then compile and download.
+Все 3 оси полноценные (движение/джоггинг/probe/обнуление по Z работают).
+Авто-хоминг по Z выключен в дефолтах (`$22=0`) — включается через настройки или
+`DEFAULT_HOMING_ENABLE 1` + `DEFAULT_HOMING_CYCLE_1 (bit(Z_AXIS))`.
 
+## Сборка
+
+Нужен [PlatformIO Core](https://platformio.org/) (или расширение PlatformIO в VS Code).
+
+```bash
+cd Firmware
+pio run -e mks_dlc32_v2_1            # сборка (по USB)
+pio run -e mks_dlc32_v2_1 -t upload  # прошивка по USB (укажите порт в platformio.ini)
+```
+
+Артефакт: `Firmware/.pio/build/mks_dlc32_v2_1/firmware.bin`.
+
+Окружения (`Firmware/platformio.ini` + `Firmware/ini/mks_dlc32.ini`):
+
+| env | Назначение |
+|---|---|
+| `mks_dlc32_v2_1` | Основное, прошивка по USB, партиция 4 МБ |
+| `mks_dlc32_v2_1_ota` | OTA по воздуху (espota), партиция 16 МБ — **только если модуль реально 16 МБ flash** |
+
+## Внешний пульт (опция, по умолчанию выключен)
+
+IDLEVEL добавил поддержку выносного пульта на ёмкостных кнопках **MPR121** (по UART) и
+беспроводного джойстика. На стоковой DLC32 v2.1 этого железа нет, поэтому поддержка
+вынесена в компайл-тайм переключатель и **по умолчанию выключена** — так не тянется
+библиотека `Adafruit_MPR121`, не занимаются GPIO 4/0 (IIC) и экономится flash.
+
+Включить пульт — раскомментировать одну строку в `Firmware/Grbl_Esp32/src/Config.h`:
+
+```c
+#define ENABLE_EXTERNAL_BOARD   /* enable support for external board */
+```
+
+Прошивка джойстика/Bluetooth-моста лежит в `Joystick/` и `GRBL_Bluetooth/` (отдельные проекты).
+
+## Статус
+
+- ✅ Собирается на Linux/Mac/Windows (исправлен Windows-only путь инклуда).
+- ✅ Пульт IDLEVEL вынесен в переключатель, по умолчанию off.
+- 🔜 Удалённое подключение (WiFi/WebUI/Telnet/OTA) — довести до отличной работы (приоритет).
+- 🔜 Развязать одновременную работу SD-карты и USB (блок `AnotherInterfaceBusy`).
+- 🔜 Фикс инициализации языка экрана (`=` вместо `==` в `mc_language_init`).
+
+Дорожная карта и список багов оригинала — в [`docs/FORK_NOTES.md`](docs/FORK_NOTES.md).
+
+## Лицензия
+
+GPLv3 (наследуется от Grbl / Grbl_ESP32). См. [`LICENSE`](LICENSE).
