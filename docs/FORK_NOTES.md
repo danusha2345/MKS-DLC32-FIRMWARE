@@ -76,10 +76,11 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
    OTA-заливка, стабильность Wi-Fi (AP/STA, реконнект). Issue оригинала #25 — вкладка
    настроек в WebUI «висит вечно». Проверять на реальной плате end-to-end.
    - [x] OTA-партиция под 8 МБ (`esp32_8MiB.csv`) — сделано, см. выше.
-   - [ ] Реконнект STA: в `WifiConfig.cpp::WiFiEvent` на `STA_DISCONNECTED` только
-         ставится флаг, реконнекта нет; `setAutoReconnect` не выставлен.
-   - [ ] mDNS поднимается только в STA (`WifiServices.cpp:102`) — нет `*.local` в AP.
+   - [x] Реконнект STA: добавлен `WiFi.setAutoReconnect(true)` в оба пути запуска STA
+         (`StartSTA`/`mks_StartSTA`). Нужна проверка на железе (обрыв → авто-восстановление).
+   - [x] mDNS теперь поднимается и в AP, и в STA (`WifiServices.cpp`) — `http://<hostname>.local`.
    - [ ] Issue #25: вкладка настроек WebUI «висит» — проверить на железе.
+   - [ ] End-to-end проверка на плате: WebUI, Telnet, WebSocket, OTA-заливка, реконнект.
 2. **SD ↔ USB одновременно.** Сейчас в `Serial.cpp` (~198, 206) блок:
    пока идёт job с SD, команды по USB/сети отбиваются `error: AnotherInterfaceBusy`.
    Развязать/смягчить, аккуратно — это защитная логика grbl.

@@ -318,6 +318,7 @@ namespace WebUI {
         }
         WiFi.enableAP(false);
         WiFi.mode(WIFI_STA);
+        WiFi.setAutoReconnect(true);  // авто-реконнект STA при обрыве Wi-Fi
         //Get parameters for STA
         String h = wifi_hostname->get();
         WiFi.setHostname(h.c_str());
@@ -363,6 +364,7 @@ namespace WebUI {
 
         WiFi.enableAP(false);
         WiFi.mode(WIFI_STA);
+        WiFi.setAutoReconnect(true);  // авто-реконнект STA при обрыве Wi-Fi
         //Get parameters for STA
         String h = wifi_hostname->get();
         WiFi.setHostname(h.c_str());
