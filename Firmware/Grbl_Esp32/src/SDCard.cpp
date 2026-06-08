@@ -309,10 +309,12 @@ SDState write_file(const char* path, const char* message) {
 // 	file.close();
 // }
 
-void sd_get_current_filename(char* name) {
+void sd_get_current_filename(char* name, size_t cap) {
+    // Раньше strcpy без границ -> переполнение буфера вызывающего (char[50/60]) при
+    // длинном имени/пути файла; срабатывало в т.ч. на каждый ?-статус во время печати.
     if (myFile) {
-        strcpy(name, myFile.name());
-    } else {
+        snprintf(name, cap, "%s", myFile.name());
+    } else if (cap) {
         name[0] = 0;
     }
 }

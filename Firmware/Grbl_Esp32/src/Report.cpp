@@ -773,7 +773,7 @@ void report_realtime_status(uint8_t client) {
     if (get_sd_state(false) == SDState::BusyPrinting) {
         sprintf(temp, "|SD:%4.2f,", sd_report_perc_complete());
         strcat(status, temp);
-        sd_get_current_filename(temp);
+        sd_get_current_filename(temp, sizeof(temp));
         strcat(status, temp);
     }
 #endif

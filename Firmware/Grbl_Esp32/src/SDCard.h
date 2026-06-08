@@ -50,7 +50,7 @@ boolean  readFileLine(char* line, int len);
 void     readFile(fs::FS& fs, const char* path);
 float    sd_report_perc_complete();
 uint32_t sd_get_current_line_number();
-void     sd_get_current_filename(char* name);
+void     sd_get_current_filename(char* name, size_t cap);
 
 
 // mks fix

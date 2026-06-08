@@ -175,8 +175,8 @@ void protocol_main_loop() {
                         setFilePos(0);
                         grbl_sendf(CLIENT_SERIAL , "times:%d\n", mks_grbl.carve_times);
                     }else {
-                        char temp[50];
-                        sd_get_current_filename(temp);
+                        char temp[128];
+                        sd_get_current_filename(temp, sizeof(temp));
                         if (mks_grbl.is_mks_ts35_flag == true) { 
                             mks_ui_page.mks_ui_page = MKS_UI_PAGE_LOADING;
                             mks_ui_page.wait_count = DEFAULT_UI_COUNT;
@@ -208,8 +208,8 @@ void protocol_main_loop() {
                 report_status_message(execute_line(fileLine, SD_client, SD_auth_level), SD_client);
             } 
             else {
-                char temp[50];
-                sd_get_current_filename(temp);
+                char temp[128];
+                sd_get_current_filename(temp, sizeof(temp));
                 if (mks_grbl.is_mks_ts35_flag == true) { 
                     mks_ui_page.mks_ui_page = MKS_UI_PAGE_LOADING;
                     mks_ui_page.wait_count = DEFAULT_UI_COUNT;
@@ -252,11 +252,20 @@ void protocol_main_loop() {
                         report_echo_line_received(line, client);
 #endif
 #ifdef ENABLE_SD_CARD
-                        // Пока с SD идёт задание, со второго интерфейса (USB/сеть) пропускаем
-                        // только read-only запросы состояния — движение/исполнение отклоняем,
-                        // чтобы не смешать два потока G-кода в одном планировщике.
-                        if (get_sd_state(false) >= SDState::Busy && !line_safe_during_sd_job(line)) {
-                            report_status_message(Error::AnotherInterfaceBusy, client);
+                        // Пока с SD идёт задание, строки со 2-го интерфейса (USB/сеть) не должны
+                        // влиять на SD-поток. report_status_message() при BusyPrinting завязан на SD
+                        // (Ok -> следующая строка файла; ошибка -> closeFile/ОБРЫВ печати), поэтому
+                        // обрабатываем их здесь и квитируем НАПРЯМУЮ, минуя его: read-only запросы
+                        // ($$/$#/$G/$I/$N) выполняем, остальное (движение/исполнение) отклоняем.
+                        if (get_sd_state(false) >= SDState::Busy) {
+                            Error sd_gate_err = line_safe_during_sd_job(line)
+                                ? execute_line(line, client, WebUI::AuthenticationLevel::LEVEL_GUEST)
+                                : Error::AnotherInterfaceBusy;
+                            if (sd_gate_err == Error::Ok) {
+                                grbl_send(client, "ok\r\n");
+                            } else {
+                                grbl_sendf(client, "error:%d\r\n", static_cast<int>(sd_gate_err));
+                            }
                             empty_line(client);
                             break;
                         }
@@ -289,7 +298,10 @@ void protocol_main_loop() {
         // check to see if we should disable the stepper drivers ... esp32 work around for disable in main loop.
         if (stepper_idle && stepper_idle_lock_time->get() != 0xff) {
             
-            if((sys.state != State::Cycle) || (sys.state != State::Hold)) {
+            // Отключать драйверы только когда станок реально простаивает — НЕ в Cycle и НЕ в Hold.
+            // (Было `||` -> тавтология «всегда истина»: моторы отключались и на паузе Hold,
+            //  теряя удерживающий момент; ось, особенно Z, могла уехать.)
+            if((sys.state != State::Cycle) && (sys.state != State::Hold)) {
 
                 if (esp_timer_get_time() > stepper_idle_counter) {
                     motors_set_disable(true);

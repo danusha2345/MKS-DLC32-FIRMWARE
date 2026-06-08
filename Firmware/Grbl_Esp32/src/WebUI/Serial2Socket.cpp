@@ -30,6 +30,11 @@
 namespace WebUI {
     Serial_2_Socket Serial2Socket;
 
+    // broadcastBIN не реентерабелен, а write() вызывается из нескольких задач
+    // (protocol loop через grbl_send и clientCheckTask). Доступ к TX-буферу сериализуем
+    // коротким спинлоком; саму отправку делает ТОЛЬКО clientCheckTask (handle_flush).
+    static portMUX_TYPE s2s_tx_mux = portMUX_INITIALIZER_UNLOCKED;
+
     Serial_2_Socket::Serial_2_Socket() {
         _web_socket   = NULL;
         _TXbufferSize = 0;
@@ -89,22 +94,17 @@ namespace WebUI {
         }
 
 #    if defined(ENABLE_SERIAL2SOCKET_OUT)
+        // Только аппенд под спинлоком; flush()/broadcastBIN выполняет clientCheckTask
+        // через handle_flush(), чтобы сокет не дёргался из двух задач. При переполнении
+        // лишние байты отбрасываем (это консольный вывод) — без записи за границу буфера.
+        portENTER_CRITICAL(&s2s_tx_mux);
         if (_TXbufferSize == 0) {
             _lastflush = millis();
         }
-
-        //send full line
-        if (_TXbufferSize + size > TXBUFFERSIZE) {
-            flush();
+        for (size_t i = 0; i < size && _TXbufferSize < TXBUFFERSIZE; i++) {
+            _TXbuffer[_TXbufferSize++] = buffer[i];
         }
-
-        //need periodic check to force to flush in case of no end
-        for (int i = 0; i < size; i++) {
-            _TXbuffer[_TXbufferSize] = buffer[i];
-            _TXbufferSize++;
-        }
-        log_i("[SOCKET]buffer size %d", _TXbufferSize);
-        handle_flush();
+        portEXIT_CRITICAL(&s2s_tx_mux);
 #    endif
         return size;
     }
@@ -165,15 +165,20 @@ namespace WebUI {
         }
     }
     void Serial_2_Socket::flush(void) {
-        if (_TXbufferSize > 0) {
-            log_i("[SOCKET]flush data, buffer size %d", _TXbufferSize);
-            _web_socket->broadcastBIN(_TXbuffer, _TXbufferSize);
-
-            //refresh timout
-            _lastflush = millis();
-
-            //reset buffer
+        // flush() выполняется только в clientCheckTask -> static-буфер безопасен и не
+        // нагружает стек. Копируем под спинлоком, broadcastBIN — уже вне критической секции.
+        static uint8_t local[TXBUFFERSIZE];
+        uint16_t       n = 0;
+        portENTER_CRITICAL(&s2s_tx_mux);
+        n = _TXbufferSize;
+        if (n) {
+            memcpy(local, _TXbuffer, n);
             _TXbufferSize = 0;
+            _lastflush    = millis();
+        }
+        portEXIT_CRITICAL(&s2s_tx_mux);
+        if (n && _web_socket) {
+            _web_socket->broadcastBIN(local, n);
         }
     }
 
