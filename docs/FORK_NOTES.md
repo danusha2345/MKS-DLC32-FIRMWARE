@@ -47,6 +47,12 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
    Проверено сборкой в обе стороны:
    - OFF (дефолт): Flash 94.0% (1 724 042 б), MPR121 не линкуется.
    - ON (`-DENABLE_EXTERNAL_BOARD`): Flash 94.2% (1 728 954 б), пульт возвращается.
+4. **OTA-партиция под реальные 8 МБ.** Создан `esp32_8MiB.csv` (2× app по 3 МБ + SPIFFS),
+   в `ini` оба env переведены на него + `board_*.flash_size = 8MB`; из OTA-env убран
+   `USE_UART_I2C_PINS` (уводил консольный Uart0 на GPIO0/4). Раньше OTA-env брал
+   `esp32_16MiB.csv`, не влезавший в 8 МБ. Теперь USB- и OTA-сборки на одной таблице
+   разделов → бинарник идентичен, плата после USB-прошивки сразу OTA-совместима.
+   Проверено сборкой обоих env: Flash 54.8% (1 724 042 б из 3 МБ-слота).
 
 ## Заметки по плате (стоковая DLC32 v2.1 + TS35)
 
@@ -56,11 +62,8 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
   Z-концевик = GPIO34.
 - Ось Z полноценная (движение/джоггинг/probe/обнуление в UI `MKS_draw_move.cpp`).
   Z-хоминг выключен в дефолтах (DLC32 продаётся «лазерным», концевика часто нет).
-- ⚠️ **Flash ~94%** — запас ~106 КБ. Перед крупными фичами следить за размером;
-  выключенный пульт уже немного освободил место.
-- ⚠️ Flash платы = **8 МБ** (ESP32-WROOM-32U), см. [`BOARD_SPEC.md`](BOARD_SPEC.md).
-  OTA-env `mks_dlc32_v2_1_ota` использует партицию `esp32_16MiB.csv` → **не влезет в 8 МБ**.
-  Для OTA нужна разбивка под 8 МБ (2× app ~3 МБ + SPIFFS). USB-env (4 МБ) укладывается.
+- Flash платы = **8 МБ** (ESP32-WROOM-32U), см. [`BOARD_SPEC.md`](BOARD_SPEC.md). Партиция
+  `esp32_8MiB.csv`: app-слот 3 МБ, прошивка ~55% — запас под фичи есть.
 
 ## Дорожная карта / TODO
 
@@ -72,6 +75,11 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
    (IDLEVEL переписал `TelnetServerClient`), WebSocket (`Serial2Socket`), mDNS-имя,
    OTA-заливка, стабильность Wi-Fi (AP/STA, реконнект). Issue оригинала #25 — вкладка
    настроек в WebUI «висит вечно». Проверять на реальной плате end-to-end.
+   - [x] OTA-партиция под 8 МБ (`esp32_8MiB.csv`) — сделано, см. выше.
+   - [ ] Реконнект STA: в `WifiConfig.cpp::WiFiEvent` на `STA_DISCONNECTED` только
+         ставится флаг, реконнекта нет; `setAutoReconnect` не выставлен.
+   - [ ] mDNS поднимается только в STA (`WifiServices.cpp:102`) — нет `*.local` в AP.
+   - [ ] Issue #25: вкладка настроек WebUI «висит» — проверить на железе.
 2. **SD ↔ USB одновременно.** Сейчас в `Serial.cpp` (~198, 206) блок:
    пока идёт job с SD, команды по USB/сети отбиваются `error: AnotherInterfaceBusy`.
    Развязать/смягчить, аккуратно — это защитная логика grbl.
