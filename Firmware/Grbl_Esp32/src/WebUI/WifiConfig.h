@@ -40,7 +40,7 @@ namespace WebUI {
     static const int ESP_APPLY_NOW = 1;
 
     //defaults values
-    static const char* DEFAULT_HOSTNAME = "grblesp";
+    static const char* DEFAULT_HOSTNAME = "mks-dlc32";  // имя устройства/mDNS; меняется в настройках WebUI ($/ESP400)
 #ifdef CONNECT_TO_SSID
     static const char* DEFAULT_STA_SSID = CONNECT_TO_SSID;
     static const char* DEFAULT_STA_PWD  = SSID_PASSWORD;

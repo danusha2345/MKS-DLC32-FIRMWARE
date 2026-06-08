@@ -134,8 +134,11 @@ const int MAX_N_AXIS = 6;
 
 //#define ENABLE_TELNET_OTHER_TASK
 
-//#define ENABLE_SERIAL2SOCKET_IN
-//#define ENABLE_SERIAL2SOCKET_OUT
+// WebUI <-> ядро GRBL по WebSocket. БЕЗ этих флагов вкладка настроек WebUI висит
+// вечно (issue #25): GRBL-команды ($$, jog, смена hostname) уходят в Serial2Socket,
+// но не читаются (IN) и ответы не уходят в сокет (OUT). Включено для рабочего WebUI.
+#define ENABLE_SERIAL2SOCKET_IN
+#define ENABLE_SERIAL2SOCKET_OUT
 
 #define TELNET_CLIENTS_TOTAL 3
 

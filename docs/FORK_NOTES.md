@@ -66,6 +66,15 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
      гравировки с карты, не рискуя смешать два потока G-кода в планировщике.
    - Классификатор покрыт **нативными тестами** (`test/test_sd_job_policy/`, `pio test -e native`,
      5/5 PASSED). Поведение на железе ещё проверить.
+6. **WebUI: оживлён канал WebUI↔ядро (issue #25).** Корень зависания вкладки настроек —
+   в `Config.h` были выключены `ENABLE_SERIAL2SOCKET_IN/OUT`. Из-за этого GRBL-команды
+   из WebUI (`$$`, jog, смена hostname) пушились в `Serial2Socket`, но не читались
+   (вход, Serial.cpp:166) и ответы не уходили в WebSocket (выход, Serial.cpp:367) —
+   `[ESP…]` (синхронный HTTP) работали, а всё GRBL — нет, вкладка настроек висела вечно.
+   Сама реализация `Serial2Socket` (ring-буферы, flush, `broadcastBIN`, `attachWS`) полная —
+   просто отключена флагами. Включил оба → собирается (Flash 54.8%). Плюс дефолтный
+   `DEFAULT_HOSTNAME` теперь `mks-dlc32` (имя устройства/mDNS; меняется в настройках WebUI).
+   Нужна проверка на железе. (MACHINE_NAME/BOARD_NAME — compile-time, только инфо.)
 
 ## Заметки по плате (стоковая DLC32 v2.1 + TS35)
 
@@ -92,7 +101,9 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
    - [x] Реконнект STA: добавлен `WiFi.setAutoReconnect(true)` в оба пути запуска STA
          (`StartSTA`/`mks_StartSTA`). Нужна проверка на железе (обрыв → авто-восстановление).
    - [x] mDNS теперь поднимается и в AP, и в STA (`WifiServices.cpp`) — `http://<hostname>.local`.
-   - [ ] Issue #25: вкладка настроек WebUI «висит» — проверить на железе.
+   - [x] Issue #25 (вкладка настроек WebUI «висит»): причина — выключенные
+         `ENABLE_SERIAL2SOCKET_IN/OUT`; включены (см. «Сделано» п.6). Проверить на железе.
+   - [x] Дефолтное имя устройства `mks-dlc32` (вместо `grblesp`); меняется в WebUI.
    - [ ] End-to-end проверка на плате: WebUI, Telnet, WebSocket, OTA-заливка, реконнект.
 2. **SD ↔ USB одновременно** — ✅ сделано (см. «Сделано» п.5): realtime + read-only
    запросы проходят во время печати с карты, движение остаётся заблокированным.
