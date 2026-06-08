@@ -106,7 +106,11 @@ const int MAX_N_AXIS = 6;
 #    define WIFI_OR_BLUETOOTH
 #endif
 
-#define ENABLE_EXTERNAL_BOARD                /* enable support for external board         */
+// ===== Внешний пульт IDLEVEL (тач-кнопки MPR121 + джойстик по UART) =====
+// Мастер-переключатель. По умолчанию ВЫКЛЮЧЕН: на стоковой MKS DLC32 v2.1 пульта нет,
+// поэтому не тянется Adafruit_MPR121, не занимаются GPIO 4/0 (IIC) и экономится flash.
+// Чтобы подключить пульт — раскомментировать строку ниже.
+//#define ENABLE_EXTERNAL_BOARD              /* enable support for external board */
 //#define EXT_BOARD_TEST
 
 #ifdef EXT_BOARD_TEST

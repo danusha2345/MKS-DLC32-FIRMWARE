@@ -1,3 +1,6 @@
+#include "Config.h"   // подтянуть мастер-флаг ENABLE_EXTERNAL_BOARD
+#ifdef ENABLE_EXTERNAL_BOARD
+
 #include "I2C.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
@@ -85,3 +88,5 @@ int i2c_available()
 {
     return 1;
 }
+
+#endif // ENABLE_EXTERNAL_BOARD

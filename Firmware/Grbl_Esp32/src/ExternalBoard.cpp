@@ -1,5 +1,8 @@
+#include "Config.h"   // подтянуть мастер-флаг ENABLE_EXTERNAL_BOARD
+#ifdef ENABLE_EXTERNAL_BOARD
+
 #include "ExternalBoard.h"
-#include "mks\MKS_draw_move.h"
+#include "mks/MKS_draw_move.h"
 
 Uart ext_board_uart = Uart(UART_NUM_1);
 
@@ -269,3 +272,5 @@ void ExternalBoard::handle()
         beep_end_ms = 0;
     }
 }
+
+#endif // ENABLE_EXTERNAL_BOARD

@@ -1,0 +1,8 @@
+# Tooling / IDE — не относится к прошивке
+.claude/
+.gitnexus/
+
+# PlatformIO build artifacts
+.pio/
+# Сгенерированный PlatformIO препроцессинг .ino (с абсолютными путями) — не коммитить
+*.ino.cpp
