@@ -118,6 +118,25 @@ Remotes: `origin` = форк, `upstream` = IDLEVEL, `makerbase` = оригина
 5. (Опц.) Z-хоминг под станок с концевиком — включить в дефолтах или документировать `$22`.
 6. (Опц.) Почистить `PCB/` (236 МБ KiCad/G-code) из истории, если не нужен.
 
+## WebUI: обновлённый билд и рецепт пересборки
+
+В `data/index.html.gz` теперь свежий **ESP3D-WEBUI v2.1.3b0** (был старый 2.1b68 от MKS):
+паузa/резюм SD-печати из веба, полный набор GRBL-оверрайдов (подача/ускоренные/шпиндель,
+реалтайм 0x90–0x9D), русский язык интерфейса (выбирается в Settings → Interface Language),
+заголовок «MKS DLC32 — ESP3D WebUI». Проверено на плате: страница отдаётся, WS-канал жив.
+
+Пересборка из исходников:
+
+```bash
+git clone --depth 1 -b 2.1 https://github.com/luc-github/ESP3D-WEBUI
+cd ESP3D-WEBUI
+# правки UI — в www/ (index.html, js/grbl.js, css/…)
+npm install && npm install -D gulp@4   # gulp 5 из package.json ломается на старых плагинах
+npx gulp package --lang grbl           # языковой набор: en/ru/uk/de/fr/es/it/pl/ptbr
+cp index.html.gz <форк>/Firmware/Grbl_Esp32/data/
+pio run -e mks_dlc32_v2_1 -t uploadfs  # залить SPIFFS на плату
+```
+
 ## Релевантные issues оригинала (makerbase, у IDLEVEL issues отключены)
 
 | # | Тема |
