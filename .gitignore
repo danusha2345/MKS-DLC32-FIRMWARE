@@ -19,6 +19,10 @@ backup/
 # Тестовые G-code файлы в корне
 /*.gcode
 /*.nc
+# Единый flash-образ генерируется из release/*.bin (8 МБ) — раздаётся в Release, не в git
+release/MKS_DLC32_full_8MB.bin
+# Zip-комплект собирается на лету для Release — не в git
+release/*.zip
 
 # === Языки / сборщики ===
 __pycache__/

@@ -1,4 +1,9 @@
-Сборка: main, 2026-06-10 (WebUI: исправлены ссылки FW/UI в навбаре)
-Прошивка: Grbl_ESP32 1.1 (2022042101) + наши фиксы
+Сборка: main dee10ed, дата 2026-06-10
+Прошивка: Grbl_ESP32 1.1 (2022042101) + фиксы форка danusha2345
 WebUI: ESP3D-WEBUI 2.1.3b0 (en/ru/uk/de/fr/es/it/pl/ptbr)
-Плата: MKS DLC32 v2.1, ESP32 8MB flash
+Плата: MKS DLC32 v2.1, ESP32-WROOM-32U, 8 МБ flash
+
+Файлы:
+  MKS_DLC32_full_8MB.bin  - единый образ на 0x0 (чистая установка, сброс Wi-Fi)
+  firmware.bin + spiffs.bin + bootloader/partitions/boot_app0
+  flash_usb.sh / flash_usb.bat - прошивка с сохранением настроек
