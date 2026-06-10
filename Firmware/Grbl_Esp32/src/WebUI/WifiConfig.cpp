@@ -306,7 +306,19 @@ namespace WebUI {
      * Start client mode (Station)
      */
 
+    // handle() (clientCheckTask) не должен дёргать WiFi.reconnect(), пока другая
+    // задача (protocol loop) ведёт подключение в StartSTA/mks_StartSTA: конкурентные
+    // вызовы esp_wifi подвешивают clientCheckTask намертво (проверено на железе).
+    static volatile bool sta_connect_busy = false;
+    namespace {
+        struct StaBusyGuard {
+            StaBusyGuard() { sta_connect_busy = true; }
+            ~StaBusyGuard() { sta_connect_busy = false; }
+        };
+    }
+
     bool WiFiConfig::StartSTA() {
+        StaBusyGuard sta_busy_guard;
         //stop active service
         wifi_services.end();
         //Sanity check
@@ -351,6 +363,7 @@ namespace WebUI {
 
 
     bool WiFiConfig::mks_StartSTA() {
+        StaBusyGuard sta_busy_guard;
         //stop active service
         wifi_services.end();
         //Sanity check
@@ -556,13 +569,14 @@ namespace WebUI {
         COMMANDS::wait(0);
         // Ядро 1.0.6 само реконнектит не все причины обрыва (AUTH_FAIL и коды <200
         // не покрыты обработчиком SYSTEM_EVENT_STA_DISCONNECTED), поэтому в STA
-        // периодически пинаем reconnect сами. Во время первичного коннекта
-        // (ConnectSTA2AP) handle() не вызывается, конфликтов нет.
+        // периодически пинаем reconnect сами. handle() работает в clientCheckTask —
+        // пока StartSTA ведёт подключение из другой задачи (sta_connect_busy),
+        // retry запрещён, иначе конкурентные вызовы esp_wifi вешают задачу.
         static const uint32_t STA_RECONNECT_INTERVAL_MS = 15000;
         static uint32_t       sta_last_ok_or_retry      = 0;
         if (WiFi.getMode() == WIFI_STA) {
             uint32_t now = millis();
-            if (WiFi.status() == WL_CONNECTED) {
+            if (sta_connect_busy || WiFi.status() == WL_CONNECTED) {
                 sta_last_ok_or_retry = now;
             } else if (now - sta_last_ok_or_retry > STA_RECONNECT_INTERVAL_MS) {
                 sta_last_ok_or_retry = now;
