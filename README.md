@@ -35,6 +35,13 @@
 Авто-хоминг по Z выключен в дефолтах (`$22=0`) — включается через настройки или
 `DEFAULT_HOMING_ENABLE 1` + `DEFAULT_HOMING_CYCLE_1 (bit(Z_AXIS))`.
 
+## Прошивка готовыми бинарниками (без PlatformIO)
+
+В [`release/`](release/) лежит всё для прошивки по USB: бинарники + скрипты
+`flash_usb.sh` (Linux/macOS) и `flash_usb.bat` (Windows). Нужен только Python
+с esptool (`pip install esptool`). Настройки Wi-Fi/GRBL при прошивке сохраняются.
+Подробная инструкция: [`release/README.md`](release/README.md).
+
 ## Сборка
 
 Нужен [PlatformIO Core](https://platformio.org/) (или расширение PlatformIO в VS Code).
