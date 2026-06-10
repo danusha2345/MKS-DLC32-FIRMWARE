@@ -318,7 +318,6 @@ namespace WebUI {
         }
         WiFi.enableAP(false);
         WiFi.mode(WIFI_STA);
-        WiFi.setAutoReconnect(true);  // авто-реконнект STA при обрыве Wi-Fi
         //Get parameters for STA
         String h = wifi_hostname->get();
         WiFi.setHostname(h.c_str());
@@ -364,7 +363,6 @@ namespace WebUI {
 
         WiFi.enableAP(false);
         WiFi.mode(WIFI_STA);
-        WiFi.setAutoReconnect(true);  // авто-реконнект STA при обрыве Wi-Fi
         //Get parameters for STA
         String h = wifi_hostname->get();
         WiFi.setHostname(h.c_str());
@@ -556,6 +554,22 @@ namespace WebUI {
     void WiFiConfig::handle() {
         //Services
         COMMANDS::wait(0);
+        // Ядро 1.0.6 само реконнектит не все причины обрыва (AUTH_FAIL и коды <200
+        // не покрыты обработчиком SYSTEM_EVENT_STA_DISCONNECTED), поэтому в STA
+        // периодически пинаем reconnect сами. Во время первичного коннекта
+        // (ConnectSTA2AP) handle() не вызывается, конфликтов нет.
+        static const uint32_t STA_RECONNECT_INTERVAL_MS = 15000;
+        static uint32_t       sta_last_ok_or_retry      = 0;
+        if (WiFi.getMode() == WIFI_STA) {
+            uint32_t now = millis();
+            if (WiFi.status() == WL_CONNECTED) {
+                sta_last_ok_or_retry = now;
+            } else if (now - sta_last_ok_or_retry > STA_RECONNECT_INTERVAL_MS) {
+                sta_last_ok_or_retry = now;
+                grbl_send(CLIENT_SERIAL, "[MSG:WiFi STA lost, reconnecting]\r\n");
+                WiFi.reconnect();
+            }
+        }
         wifi_services.handle();
     }
 

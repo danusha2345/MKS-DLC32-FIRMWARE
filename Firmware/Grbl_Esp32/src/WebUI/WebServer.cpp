@@ -201,8 +201,8 @@ namespace WebUI {
         //start webserver
         _webserver->begin();
 #    ifdef ENABLE_MDNS
-        //add mDNS
-        if (WiFi.getMode() == WIFI_STA) {
+        //add mDNS (и в STA, и в AP — согласовано с MDNS.begin в WifiServices)
+        if (WiFi.getMode() == WIFI_STA || WiFi.getMode() == WIFI_AP) {
             MDNS.addService("http", "tcp", _port);
         }
 #    endif
@@ -220,6 +220,9 @@ namespace WebUI {
         mdns_service_remove("_http", "_tcp");
 #    endif
         if (_socket_server) {
+            // Сначала отцепить Serial2Socket: после end() ещё идут grbl_send(CLIENT_ALL)
+            // (StopWiFi/StartSTA), и flush() по висячему указателю = use-after-free.
+            Serial2Socket.detachWS();
             delete _socket_server;
             _socket_server = NULL;
         }
