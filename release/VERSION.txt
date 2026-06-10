@@ -1,4 +1,4 @@
-Сборка: коммит 53b54f5 (main), 2026-06-10
+Сборка: main, 2026-06-10 (WebUI: исправлены ссылки FW/UI в навбаре)
 Прошивка: Grbl_ESP32 1.1 (2022042101) + наши фиксы
 WebUI: ESP3D-WEBUI 2.1.3b0 (en/ru/uk/de/fr/es/it/pl/ptbr)
 Плата: MKS DLC32 v2.1, ESP32 8MB flash
