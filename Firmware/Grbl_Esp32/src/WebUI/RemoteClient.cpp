@@ -33,6 +33,12 @@ namespace WebUI {
     }
 
     void Remote_Client::handle() {
+        // clientCheckTask может дёрнуть handle() раньше, чем make_settings()
+        // создаст объекты настроек
+        if (remote_server_address == NULL) {
+            return;
+        }
+
         const char* server = remote_server_address->get();
         if (*server == '\0') {  // адрес не задан — функция выключена
             return;
