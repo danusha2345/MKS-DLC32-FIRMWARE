@@ -42,6 +42,10 @@ namespace WebUI {
     extern IntSetting*    http_port;
     extern EnumSetting*   telnet_enable;
     extern IntSetting*    telnet_port;
+
+    extern StringSetting* remote_server_address;
+    extern StringSetting* remote_machine_token;
+    extern StringSetting* remote_machine_name;
 #endif
 
 #ifdef WIFI_OR_BLUETOOTH

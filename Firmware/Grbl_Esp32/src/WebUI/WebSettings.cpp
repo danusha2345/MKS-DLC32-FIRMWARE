@@ -56,6 +56,10 @@ namespace WebUI {
     EnumSetting*   telnet_enable;
     IntSetting*    telnet_port;
 
+    StringSetting* remote_server_address;
+    StringSetting* remote_machine_token;
+    StringSetting* remote_machine_name;
+
     typedef std::map<const char*, int8_t, cmp_str> enum_opt_t;
 
     enum_opt_t staModeOptions = {
@@ -1169,6 +1173,14 @@ namespace WebUI {
         telnet_port = new IntSetting(
             "Telnet Port", WEBSET, WA, "ESP131", "Telnet/Port", DEFAULT_TELNETSERVER_PORT, MIN_TELNET_PORT, MAX_TELNET_PORT, NULL);
         telnet_enable = new EnumSetting("Telnet Enable", WEBSET, WA, "ESP130", "Telnet/Enable", DEFAULT_TELNET_STATE, &onoffOptions, NULL);
+        // удалённое управление: адрес сервера (host:port, пусто = выключено),
+        // токен станка и человекочитаемое имя для оператора
+        remote_server_address =
+            new StringSetting("Remote Server", WEBSET, WA, "ESP150", "Remote/Server", "", 0, 128, NULL);
+        remote_machine_token =
+            new StringSetting("Machine Token", WEBSET, WA, "ESP151", "Remote/Token", "", 0, 250, NULL);
+        remote_machine_name =
+            new StringSetting("Machine Name", WEBSET, WA, "ESP152", "Remote/Name", "", 0, 64, NULL);
         http_port =
             new IntSetting("HTTP Port", WEBSET, WA, "ESP121", "Http/Port", DEFAULT_WEBSERVER_PORT, MIN_HTTP_PORT, MAX_HTTP_PORT, NULL);
         http_enable   = new EnumSetting("HTTP Enable", WEBSET, WA, "ESP120", "Http/Enable", DEFAULT_HTTP_STATE, &onoffOptions, NULL);

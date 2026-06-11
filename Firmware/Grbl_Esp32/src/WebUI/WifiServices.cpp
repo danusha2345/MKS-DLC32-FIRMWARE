@@ -36,6 +36,7 @@
 #    endif
 #    ifdef ENABLE_TELNET
 #        include "TelnetServer.h"
+#        include "RemoteClient.h"
 #    endif
 #    ifdef ENABLE_NOTIFICATIONS
 #        include "NotificationsService.h"
@@ -114,6 +115,7 @@ namespace WebUI {
 #    endif
 #    ifdef ENABLE_TELNET
         Telnet_Server::begin_all();
+        Remote_Client::begin();
 #    endif
 #    ifdef ENABLE_NOTIFICATIONS
         notificationsservice.begin();
@@ -127,6 +129,7 @@ namespace WebUI {
         notificationsservice.end();
 #    endif
 #    ifdef ENABLE_TELNET
+        Remote_Client::end();
         Telnet_Server::end_all();
 #    endif
 #    ifdef ENABLE_HTTP
@@ -163,6 +166,7 @@ namespace WebUI {
 #    endif
 #    ifdef ENABLE_TELNET
         Telnet_Server::handle_all();
+        Remote_Client::handle();
 #    endif
     }
 }

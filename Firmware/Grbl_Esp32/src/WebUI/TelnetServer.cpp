@@ -43,6 +43,14 @@ namespace WebUI {
 
     void Telnet_Server::begin_all()
     {
+        // Слоты клиентов нужны и при выключенном входящем telnet:
+        // через них работает исходящее подключение к удалённому серверу (Remote_Client)
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+        {
+            telnet_server[i]._client_index = i;
+            telnet_server[i].begin();
+        }
+
         if (telnet_enable->get() == 0) {
             return;
         }
@@ -56,12 +64,6 @@ namespace WebUI {
         grbl_send(CLIENT_ALL, (char*)s.c_str());
         //start telnet server
         _telnetserver->begin();
-
-        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
-        {
-            telnet_server[i]._client_index = i;
-            telnet_server[i].begin();
-        }
 
         #ifdef ENABLE_TELNET_OTHER_TASK
             xTaskCreatePinnedToCore([](void* arg) 
@@ -103,12 +105,9 @@ namespace WebUI {
 
     void Telnet_Server::handle_all()
     {
-        if(_telnetserver == NULL)
-            return;
-
         bool client_found = false;
-        
-        if (_telnetserver->hasClient()) 
+
+        if (_telnetserver != NULL && _telnetserver->hasClient())
         {
             for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
             {
@@ -142,6 +141,22 @@ namespace WebUI {
     {
         for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
             telnet_server[i].handle();
+    }
+
+    // Посадить внешний (исходящий) сокет в свободный слот — дальше он
+    // обслуживается так же, как обычный входящий telnet-клиент
+    bool Telnet_Server::attach_client(WiFiClient& client)
+    {
+        for(auto i = 0; i < TELNET_CLIENTS_TOTAL; i++)
+        {
+            if (!telnet_server[i].is_connected())
+            {
+                telnet_server[i].setup_client(client);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     void Telnet_Server::write(uint8_t client, const uint8_t* buffer, size_t size)
