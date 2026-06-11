@@ -11,14 +11,39 @@
 #    include "RemoteClient.h"
 #    include "TelnetServer.h"
 #    include <WiFi.h>
+#    include <WiFiUdp.h>
 
 namespace WebUI {
     static const uint32_t RETRY_INTERVAL_MS  = 15000;  // пауза между попытками подключения
     static const int32_t  CONNECT_TIMEOUT_MS = 2000;
+    static const uint16_t DISCOVERY_PORT     = 33333;  // UDP-маячок, пока сервер не задан
+    static const uint32_t BEACON_INTERVAL_MS = 5000;
 
     static WiFiClient _remoteClient;
+    static WiFiUDP    _beaconUdp;
     static uint32_t   _lastAttempt  = 0;
+    static uint32_t   _lastBeacon   = 0;
     static bool       _wasConnected = false;
+
+    // Пока адрес сервера не задан, плата объявляет о себе broadcast-пакетом,
+    // чтобы сервер мог найти её в сети и прописать настройки по HTTP
+    static void send_discovery_beacon() {
+        uint32_t now = millis();
+        if ((now - _lastBeacon) < BEACON_INTERVAL_MS) {
+            return;
+        }
+        _lastBeacon = now ? now : 1;
+
+        if (!WiFi.isConnected()) {
+            return;
+        }
+
+        String beacon = "[DISCOVER:mac=" + WiFi.macAddress() + ",ip=" + WiFi.localIP().toString() +
+                        ",name=" + String(remote_machine_name->get()) + ",fw=grbl" + GRBL_VERSION + "-" + GRBL_VERSION_BUILD + "]";
+        _beaconUdp.beginPacket(IPAddress(255, 255, 255, 255), DISCOVERY_PORT);
+        _beaconUdp.write((const uint8_t*)beacon.c_str(), beacon.length());
+        _beaconUdp.endPacket();
+    }
 
     void Remote_Client::begin() {
         _lastAttempt  = 0;
@@ -40,7 +65,8 @@ namespace WebUI {
         }
 
         const char* server = remote_server_address->get();
-        if (*server == '\0') {  // адрес не задан — функция выключена
+        if (*server == '\0') {  // адрес не задан — маячим, чтобы сервер нашёл плату
+            send_discovery_beacon();
             return;
         }
 
