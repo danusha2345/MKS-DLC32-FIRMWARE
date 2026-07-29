@@ -32,6 +32,14 @@ namespace Motors {
 
     bool TrinamicUartDriver::_uart_started = false;
 
+    SemaphoreHandle_t TrinamicUartDriver::_uart_lock = NULL;
+
+    // RAII-захват шины TMC на время одной UART-транзакции (см. _uart_lock)
+    struct TmcBusLock {
+        TmcBusLock() { xSemaphoreTake(TrinamicUartDriver::_uart_lock, portMAX_DELAY); }
+        ~TmcBusLock() { xSemaphoreGive(TrinamicUartDriver::_uart_lock); }
+    };
+
     TrinamicUartDriver* TrinamicUartDriver::List = NULL;  // a static ist of all drivers for stallguard reporting
 
     /* HW Serial Constructor. */
@@ -44,6 +52,7 @@ namespace Motors {
         this->addr          = addr;
 
         if (!_uart_started) {
+            _uart_lock = xSemaphoreCreateMutex();
             tmc_serial.setPins(TMC_UART_TX, TMC_UART_RX);
             tmc_serial.begin(115200, Uart::Data::Bits8, Uart::Stop::Bits1, Uart::Parity::None);
             _uart_started = true;
@@ -122,6 +131,7 @@ namespace Motors {
         if (_has_errors) {
             return false;
         }
+        TmcBusLock lock;
         switch (tmcstepper->test_connection()) {
             case 1:
                 grbl_msg_sendf(CLIENT_SERIAL,
@@ -187,9 +197,7 @@ namespace Motors {
                 hold_i_percent = 1.0;
         }
         TrinamicMicrosteps usteps = trinamic_normalize_microsteps(axis_settings[_axis_index]->microsteps->get());
-        if (usteps.valid) {
-            tmcstepper->microsteps(usteps.value);
-        } else {
+        if (!usteps.valid) {
             grbl_msg_sendf(CLIENT_SERIAL,
                            MsgLevel::Info,
                            "%s driver microsteps %d unsupported (use 0,2,4...256), driver unchanged",
@@ -197,6 +205,10 @@ namespace Motors {
                            usteps.value);
         }
 
+        TmcBusLock lock;
+        if (usteps.valid) {
+            tmcstepper->microsteps(usteps.value);
+        }
         if (trinamic_current_is_off(run_i_ma)) {
             // rms_current(0) вычисляет CS = -1, которое как uint8_t становится 255
             // и обрезается до 31 — то есть максимальный ток вместо выключенного.
@@ -235,6 +247,7 @@ namespace Motors {
 
         _mode = newMode;
 
+        TmcBusLock lock;
         switch (_mode) {
             case TrinamicUartMode ::StealthChop:
                 grbl_msg_sendf(CLIENT_SERIAL, MsgLevel::Info, "StealthChop");
@@ -266,6 +279,7 @@ namespace Motors {
         if (_has_errors) {
             return;
         }
+        TmcBusLock lock;
         uint32_t tstep = tmcstepper->TSTEP();
 
         if (tstep == 0xFFFFF || tstep < 1) {  // if axis is not moving return
