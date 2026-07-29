@@ -32,6 +32,14 @@ namespace Motors {
 
     bool TrinamicUartDriver::_uart_started = false;
 
+    SemaphoreHandle_t TrinamicUartDriver::_uart_lock = NULL;
+
+    // RAII-захват шины TMC на время одной UART-транзакции (см. _uart_lock)
+    struct TmcBusLock {
+        TmcBusLock() { xSemaphoreTake(TrinamicUartDriver::_uart_lock, portMAX_DELAY); }
+        ~TmcBusLock() { xSemaphoreGive(TrinamicUartDriver::_uart_lock); }
+    };
+
     TrinamicUartDriver* TrinamicUartDriver::List = NULL;  // a static ist of all drivers for stallguard reporting
 
     /* HW Serial Constructor. */
@@ -44,6 +52,7 @@ namespace Motors {
         this->addr          = addr;
 
         if (!_uart_started) {
+            _uart_lock = xSemaphoreCreateMutex();
             tmc_serial.setPins(TMC_UART_TX, TMC_UART_RX);
             tmc_serial.begin(115200, Uart::Data::Bits8, Uart::Stop::Bits1, Uart::Parity::None);
             _uart_started = true;
@@ -111,8 +120,8 @@ namespace Motors {
                        pinName(_dir_pin).c_str(),
                        pinName(_disable_pin).c_str(),
                        TMC_UART,
-                       pinName(TMC_UART_RX),
-                       pinName(TMC_UART_TX),
+                       pinName(TMC_UART_RX).c_str(),
+                       pinName(TMC_UART_TX).c_str(),
                        this->addr,
                        _r_sense,
                        reportAxisLimitsMsg(_axis_index));
@@ -122,6 +131,7 @@ namespace Motors {
         if (_has_errors) {
             return false;
         }
+        TmcBusLock lock;
         switch (tmcstepper->test_connection()) {
             case 1:
                 grbl_msg_sendf(CLIENT_SERIAL,
@@ -186,6 +196,7 @@ namespace Motors {
             if (hold_i_percent > 1.0)
                 hold_i_percent = 1.0;
         }
+        TmcBusLock lock;
         tmcstepper->microsteps(axis_settings[_axis_index]->microsteps->get());
         tmcstepper->rms_current(run_i_ma, hold_i_percent);
 
@@ -218,6 +229,7 @@ namespace Motors {
 
         _mode = newMode;
 
+        TmcBusLock lock;
         switch (_mode) {
             case TrinamicUartMode ::StealthChop:
                 grbl_msg_sendf(CLIENT_SERIAL, MsgLevel::Info, "StealthChop");
@@ -249,6 +261,7 @@ namespace Motors {
         if (_has_errors) {
             return;
         }
+        TmcBusLock lock;
         uint32_t tstep = tmcstepper->TSTEP();
 
         if (tstep == 0xFFFFF || tstep < 1) {  // if axis is not moving return

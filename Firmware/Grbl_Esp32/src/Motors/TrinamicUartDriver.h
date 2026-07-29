@@ -80,6 +80,11 @@ namespace Motors {
         static bool _uart_started;
 
     public:
+        // Сериализация транзакций на общей UART-шине: настройки пишутся из
+        // задачи, исполняющей $-команду, а readSgTask читает регистры из своей
+        // задачи — без мьютекса датаграммы перемешиваются.
+        static SemaphoreHandle_t _uart_lock;
+
         TrinamicUartDriver(uint8_t  axis_index,
                            uint8_t  step_pin,
                            uint8_t  dir_pin,
