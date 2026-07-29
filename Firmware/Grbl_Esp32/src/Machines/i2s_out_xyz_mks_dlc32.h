@@ -82,8 +82,44 @@
 #define Z_STEP_PIN                  I2SO(3)
 #endif
 
+// TMC2209 в UART-режиме (env mks_dlc32_v2_1_tmc): общая шина на пинах
+// разъёма I2C — TX=IO0 через резистор ~1 кОм на линию PDN_UART, RX=IO4
+// на неё же напрямую. Адрес каждого драйвера задаётся его MS1/MS2.
+// Пины I2C при этом заняты шиной, поэтому coolant (M7/M8) недоступен.
+#ifdef USE_TMC2209_UART
+#define TMC_UART                    UART_NUM_2
+#define TMC_UART_TX                 GPIO_NUM_0
+#define TMC_UART_RX                 GPIO_NUM_4
+
+#define TRINAMIC_UART_RUN_MODE      TrinamicUartMode :: StealthChop
+#define TRINAMIC_UART_HOMING_MODE   TrinamicUartMode :: StealthChop
+
+#define X_TRINAMIC_DRIVER           2209
+#define X_DRIVER_ADDRESS            0
+#define X_RSENSE                    TMC2209_RSENSE_DEFAULT
+#define DEFAULT_X_MICROSTEPS        16
+#define DEFAULT_X_CURRENT           0.8     // А (RMS)
+#define DEFAULT_X_HOLD_CURRENT      0.4     // А (RMS)
+
+#define Y_TRINAMIC_DRIVER           2209
+#define Y_DRIVER_ADDRESS            1
+#define Y_RSENSE                    TMC2209_RSENSE_DEFAULT
+#define DEFAULT_Y_MICROSTEPS        16
+#define DEFAULT_Y_CURRENT           0.8     // А (RMS)
+#define DEFAULT_Y_HOLD_CURRENT      0.4     // А (RMS)
+
+#if defined(USR_Z_MOTOR)
+#define Z_TRINAMIC_DRIVER           2209
+#define Z_DRIVER_ADDRESS            2
+#define Z_RSENSE                    TMC2209_RSENSE_DEFAULT
+#define DEFAULT_Z_MICROSTEPS        16
+#define DEFAULT_Z_CURRENT           0.8     // А (RMS)
+#define DEFAULT_Z_HOLD_CURRENT      0.4     // А (RMS)
+#endif
+#endif
+
 // Laser pin set
-#define SPINDLE_TYPE                SpindleType::PWM 
+#define SPINDLE_TYPE                SpindleType::PWM
 #ifdef USE_BOARD_V2_0
 #define SPINDLE_OUTPUT_PIN          GPIO_NUM_32
 #else 
@@ -123,8 +159,10 @@
 #define IIC_SDA                     GPIO_NUM_0
 
 //#define COOLANT_FLOOD_PIN           IIC_SCL
+#ifndef USE_TMC2209_UART
 #define COOLANT_FLOOD_PIN           IIC_SCL
 #define COOLANT_MIST_PIN            IIC_SDA
+#endif
 
 //sd card spi
 #define GRBL_SPI_SCK 			    GPIO_NUM_14
