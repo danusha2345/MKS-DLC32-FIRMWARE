@@ -80,7 +80,14 @@ namespace Motors {
         init_step_dir_pins();  // from StandardStepper
         config_message();
 
-        tmcstepper->begin();
+        {
+            TmcBusLock lock;
+            tmcstepper->begin();
+            // Даташит TMC2209, разд. 4.1.2: на шине с несколькими слейвами
+            // SENDDELAY должен быть >= 2, иначе драйвер начинает ответ раньше,
+            // чем мастер отпустит линию. По умолчанию в TMCStepper SLAVECONF=0.
+            tmcstepper->senddelay(2);
+        }
 
         _has_errors = !test();  // Try communicating with motor. Prints an error if there is a problem.
 
