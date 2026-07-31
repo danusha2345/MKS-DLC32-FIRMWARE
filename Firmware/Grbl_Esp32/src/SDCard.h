@@ -46,15 +46,9 @@ SDState  set_sd_state(SDState state);
 void     listDir(fs::FS& fs, const char* dirname, uint8_t levels, uint8_t client);
 boolean  openFile(fs::FS& fs, const char* path);
 boolean  closeFile();
-// Результат чтения строки с SD. Раньше всё это возвращалось одним false, и
-// вызывающий не мог отличить конец файла от ошибки/слишком длинной строки —
-// задание завершалось с рапортом об успехе посреди файла.
-enum class SDLineResult : uint8_t {
-    Line,       // строка прочитана (в т.ч. пустая)
-    Eof,        // файл закончился
-    TooLong,    // строка не влезает в буфер
-    ReadError,  // файл не открыт / ошибка чтения
-};
+// SDLineResult и разбор строки живут в SDLineReader.h — без зависимостей от
+// железа, чтобы логику можно было проверять нативными тестами.
+#include "SDLineReader.h"
 
 SDLineResult readFileLine(char* line, size_t cap);
 void     readFile(fs::FS& fs, const char* path);

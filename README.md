@@ -85,8 +85,17 @@ cd Firmware
 pio test -e native
 ```
 
-Тесты лежат в `Firmware/test/`. Сейчас покрыт классификатор политики SD↔USB
-(`line_safe_during_sd_job`, см. `test/test_sd_job_policy/`).
+Тесты лежат в `Firmware/test/`, чистая логика — в модулях без зависимостей от
+железа, чтобы её можно было гонять нативно:
+
+| Модуль | Тесты | Что покрыто |
+|---|---|---|
+| `src/SDJobPolicy.cpp` | `test_sd_job_policy` | политика «SD-печать + команды со второго интерфейса» |
+| `src/SDLineReader.cpp` | `test_sd_line_reader` | разбор строки G-кода: границы буфера, EOF, ошибка чтения |
+| `src/Motors/TrinamicSettings.cpp` | `test_trinamic_settings` | микрошаг вне ряда, деление на ноль в `calc_tstep`, нулевой ток |
+
+Всего 23 теста. Драйверы и `readFileLine` остаются тонкими обёртками над этими
+модулями — железо в тестах не участвует.
 
 ## Внешний пульт (опция, по умолчанию выключен)
 
