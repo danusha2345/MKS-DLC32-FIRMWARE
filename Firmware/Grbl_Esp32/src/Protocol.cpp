@@ -178,6 +178,11 @@ void protocol_main_loop() {
                     grbl_notifyf("SD print failed", "%s aborted: %s (line %u)", temp, why, sd_get_current_line_number());
                     grbl_sendf(CLIENT_ALL, "SD Print Failed: %s at line %u\n", why, sd_get_current_line_number());
                     mks_grbl.carve_times = 0;
+
+                    sys_rt_f_override                    = FeedOverride::Default;
+                    sys_rt_r_override                    = RapidOverride::Default;
+                    sys_rt_s_override                    = SpindleSpeedOverride::Default;
+
                     closeFile();  // снимает признаки печати даже при невалидном файле
                 }
                 else {

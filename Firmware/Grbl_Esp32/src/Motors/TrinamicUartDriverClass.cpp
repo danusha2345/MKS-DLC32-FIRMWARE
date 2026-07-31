@@ -111,8 +111,8 @@ namespace Motors {
                        pinName(_dir_pin).c_str(),
                        pinName(_disable_pin).c_str(),
                        TMC_UART,
-                       pinName(TMC_UART_RX),
-                       pinName(TMC_UART_TX),
+                       pinName(TMC_UART_RX).c_str(),
+                       pinName(TMC_UART_TX).c_str(),
                        this->addr,
                        _r_sense,
                        reportAxisLimitsMsg(_axis_index));

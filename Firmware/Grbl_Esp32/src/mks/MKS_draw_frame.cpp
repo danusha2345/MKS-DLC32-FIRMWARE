@@ -322,6 +322,9 @@ void mks_run_frame(char *parameter) {
     if (sd_line == SDLineResult::TooLong || sd_line == SDLineResult::ReadError) {
         grbl_sendf(CLIENT_SERIAL, "frame aborted: %s\n", (sd_line == SDLineResult::TooLong) ? "line too long" : "read error");
         mks_lv_label_updata(frame_page.label_text, "File error");
+        // Границы посчитаны частично: повторный запуск обязан заново распарсить
+        // файл, а не проехать рамку по обрывку (выше is_use_same_file уже true).
+        frame_ctrl.is_use_same_file = false;
         frame_ctrl.is_begin_run  = false;
         frame_ctrl.cancle_enable = true;
         return;

@@ -300,7 +300,9 @@ static int sd_file_next_byte(void* ctx) {
 SDLineResult readFileLine(char* line, size_t cap) {
     SdFileLock _lk;
     if (!myFile) {
-        report_status_message(Error::FsFailedRead, SD_client);
+        // Не рапортуем отсюда: все вызывающие обрабатывают ReadError сами,
+        // а report_status_message при BusyPrinting ещё и закрывал бы файл —
+        // выходило два сообщения и двойной cleanup на одно событие.
         return SDLineResult::ReadError;
     }
     sd_current_line_number += 1;

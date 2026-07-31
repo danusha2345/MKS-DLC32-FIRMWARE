@@ -20,6 +20,10 @@
 #include <SD.h>
 #include <SPI.h>
 
+// SDLineResult и разбор строки живут в SDLineReader.h — без зависимостей от
+// железа, чтобы логику можно было проверять нативными тестами.
+#include "SDLineReader.h"
+
 //#define SDCARD_DET_PIN -1
 const int SDCARD_DET_VAL = 0;  // for now, CD is close to ground
 
@@ -46,10 +50,6 @@ SDState  set_sd_state(SDState state);
 void     listDir(fs::FS& fs, const char* dirname, uint8_t levels, uint8_t client);
 boolean  openFile(fs::FS& fs, const char* path);
 boolean  closeFile();
-// SDLineResult и разбор строки живут в SDLineReader.h — без зависимостей от
-// железа, чтобы логику можно было проверять нативными тестами.
-#include "SDLineReader.h"
-
 SDLineResult readFileLine(char* line, size_t cap);
 void     readFile(fs::FS& fs, const char* path);
 float    sd_report_perc_complete();
