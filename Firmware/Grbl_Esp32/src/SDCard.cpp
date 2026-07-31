@@ -238,6 +238,16 @@ boolean openFile(fs::FS& fs, const char* path) {
 boolean closeFile() {
     SdFileLock _lk;
     if (!myFile) {
+        // Файл уже невалиден — например, карту выдернули посреди задания. Раньше
+        // здесь был ранний return, и SD оставался в BusyPrinting: последующие
+        // операции получали Busy, а SD_ready_next продолжал требовать чтения.
+        // Состояние загрузки по HTTP не трогаем — им владеет WebServer.
+        if (get_sd_state(false) == SDState::BusyPrinting) {
+            set_sd_state(SDState::Idle);
+        }
+        SD_ready_next          = false;
+        sd_current_line_number = 0;
+        sd_total_line_number   = 0;
         return false;
     }
     set_sd_state(SDState::Idle);
