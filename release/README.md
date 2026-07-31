@@ -85,6 +85,6 @@ pio run -e mks_dlc32_v2_1_ota -t upload --upload-port <IP-платы>
 ## Откуда взялись бинарники
 
 Собраны из этого репозитория: `pio run -e mks_dlc32_v2_1` (+`-t buildfs` для
-SPIFFS); `bootloader.bin`/`boot_app0.bin` — стандартные из arduino-esp32 1.0.6
-(`bootloader_dout_80m.bin`). Адреса соответствуют тому, что пишет
+SPIFFS); `bootloader.bin`/`boot_app0.bin` — из arduino-esp32 2.0.17
+(espressif32 6.12.0). Адреса соответствуют тому, что пишет
 `pio run -t upload` (проверено `-v`).
