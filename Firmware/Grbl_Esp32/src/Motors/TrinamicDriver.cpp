@@ -208,23 +208,18 @@ namespace Motors {
             if (hold_i_percent > 1.0)
                 hold_i_percent = 1.0;
         }
-        // TMCStepper::microsteps() молча игнорирует всё, чего нет в его switch,
-        // поэтому проверяем сами: допустимы 0 (полный шаг) и степени двойки 2…256.
-        uint16_t usteps = axis_settings[_axis_index]->microsteps->get();
-        if (usteps == 1) {
-            usteps = 0;  // в grbl 1 = полный шаг, у драйвера это 0
-        }
-        if ((usteps == 0) || (usteps <= 256 && (usteps & (usteps - 1)) == 0)) {
-            tmcstepper->microsteps(usteps);
+        TrinamicMicrosteps usteps = trinamic_normalize_microsteps(axis_settings[_axis_index]->microsteps->get());
+        if (usteps.valid) {
+            tmcstepper->microsteps(usteps.value);
         } else {
             grbl_msg_sendf(CLIENT_SERIAL,
                            MsgLevel::Info,
                            "%s driver microsteps %d unsupported (use 0,2,4...256), driver unchanged",
                            reportAxisNameMsg(_axis_index, _dual_axis_index),
-                           usteps);
+                           usteps.value);
         }
 
-        if (run_i_ma == 0) {
+        if (trinamic_current_is_off(run_i_ma)) {
             // rms_current(0) вычисляет CS = -1, которое как uint8_t становится 255
             // и обрезается до 31 — то есть максимальный ток вместо выключенного.
             tmcstepper->irun(0);
@@ -332,13 +327,8 @@ namespace Motors {
     // This is used to set the stallguard window from the homing speed.
     // The percent is the offset on the window
     uint32_t TrinamicDriver::calc_tstep(float speed, float percent) {
-        // microsteps == 0 означает полный шаг; без этой поправки целочисленное
-        // 256 / 0 роняет ESP32 (IntegerDivideByZero) при StallGuard-хоминге.
-        uint16_t usteps = axis_settings[_axis_index]->microsteps->get();
-        if (usteps == 0) {
-            usteps = 1;
-        }
-        float tstep = speed / 60.0 * axis_settings[_axis_index]->steps_per_mm->get() * (float)(256 / usteps);
+        float tstep = speed / 60.0 * axis_settings[_axis_index]->steps_per_mm->get() *
+                      (float)trinamic_tstep_divisor(axis_settings[_axis_index]->microsteps->get());
         tstep = TRINAMIC_FCLK / tstep * percent / 100.0;
 
         return static_cast<uint32_t>(tstep);

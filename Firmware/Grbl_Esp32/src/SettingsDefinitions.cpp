@@ -1,4 +1,5 @@
 #include "Grbl.h"
+#include "Motors/TrinamicSettings.h"
 
 FlagSetting* verbose_errors;
 
@@ -218,10 +219,7 @@ static bool checkMicrosteps(char* value) {
     if (endptr == value || *endptr != '\0') {
         return true;  // формат разберёт сам IntSetting
     }
-    if (ms == 0 || ms == 1) {
-        return true;  // полный шаг
-    }
-    return ms > 0 && ms <= 256 && (ms & (ms - 1)) == 0;
+    return trinamic_normalize_microsteps(ms).valid;
 }
 
 static bool postMotorSetting(char* value) {

@@ -23,6 +23,8 @@
 #include "StandardStepper.h"
 #include "../Uart.h"
 
+#include "TrinamicSettings.h"
+
 #include <TMCStepper.h>  // https://github.com/teemuatlut/TMCStepper
 
 const float TMC2208_RSENSE_DEFAULT = 0.11f;

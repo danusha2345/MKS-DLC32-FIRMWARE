@@ -285,42 +285,26 @@ boolean mks_openFile(fs::FS& fs, const char* path) {
   make uppercase
   return true if a line is
 */
+// Источник байтов для sd_read_line: File::read() возвращает int и -1 на ошибке.
+// Если привести сразу к char, ошибка превращается в 0xFF, позиция не двигается,
+// и цикл добивает буфер мусором до ложного TooLong.
+static int sd_file_next_byte(void* ctx) {
+    File* f = static_cast<File*>(ctx);
+    if (!f->available()) {
+        return SD_LINE_EOF;
+    }
+    int ch = f->read();
+    return (ch < 0) ? SD_LINE_ERROR : ch;
+}
+
 SDLineResult readFileLine(char* line, size_t cap) {
     SdFileLock _lk;
     if (!myFile) {
         report_status_message(Error::FsFailedRead, SD_client);
         return SDLineResult::ReadError;
     }
-    if (cap == 0) {
-        return SDLineResult::ReadError;
-    }
     sd_current_line_number += 1;
-    size_t len = 0;
-    while (myFile.available()) {
-        // File::read() возвращает int и отдаёт -1 на ошибке. Если сразу привести
-        // к char, ошибка превращается в 0xFF, позиция не двигается и цикл добивает
-        // буфер мусором до ложного TooLong.
-        int ch = myFile.read();
-        if (ch < 0) {
-            line[len] = '\0';
-            return SDLineResult::ReadError;
-        }
-        char c = (char)ch;
-        if (c == '\n') {
-            line[len] = '\0';
-            return SDLineResult::Line;
-        }
-        // Место под терминатор резервируется здесь, а не после цикла: раньше
-        // строка длиной ровно cap записывала '\0' за границей буфера.
-        if (len + 1 >= cap) {
-            line[cap - 1] = '\0';
-            return SDLineResult::TooLong;
-        }
-        line[len++] = c;
-    }
-    line[len] = '\0';
-    // Последняя строка без завершающего перевода строки — это тоже строка.
-    return len ? SDLineResult::Line : SDLineResult::Eof;
+    return sd_read_line(line, cap, sd_file_next_byte, &myFile);
 }
 
 boolean readFileBuff(uint8_t *buf, uint32_t size) {

@@ -22,6 +22,8 @@
 #include "Motor.h"
 #include "StandardStepper.h"
 
+#include "TrinamicSettings.h"
+
 #include <TMCStepper.h>  // https://github.com/teemuatlut/TMCStepper
 
 //#define TRINAMIC_MODE_STEALTHCHOP 0  // very quiet
