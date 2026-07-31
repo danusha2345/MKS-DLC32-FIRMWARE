@@ -287,7 +287,15 @@ SDLineResult readFileLine(char* line, size_t cap) {
     sd_current_line_number += 1;
     size_t len = 0;
     while (myFile.available()) {
-        char c = myFile.read();
+        // File::read() возвращает int и отдаёт -1 на ошибке. Если сразу привести
+        // к char, ошибка превращается в 0xFF, позиция не двигается и цикл добивает
+        // буфер мусором до ложного TooLong.
+        int ch = myFile.read();
+        if (ch < 0) {
+            line[len] = '\0';
+            return SDLineResult::ReadError;
+        }
+        char c = (char)ch;
         if (c == '\n') {
             line[len] = '\0';
             return SDLineResult::Line;

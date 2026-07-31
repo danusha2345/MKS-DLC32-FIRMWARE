@@ -285,8 +285,10 @@ void mks_run_frame(char *parameter) {
     y1point_flag = false;
     y2point_flag = false;
 
-    while ( (readFileLine(fileLine, sizeof(fileLine)) == SDLineResult::Line)   && 
-            (frame_ctrl.is_read_file)       && 
+    SDLineResult sd_line = SDLineResult::Line;
+
+    while ( ((sd_line = readFileLine(fileLine, sizeof(fileLine))) == SDLineResult::Line) &&
+            (frame_ctrl.is_read_file)       &&
             (frame_ctrl.is_use_same_file == false)) {
         
         grbl_send(CLIENT_SERIAL ,"enter while \n");
@@ -314,6 +316,17 @@ void mks_run_frame(char *parameter) {
                                 frame_ctrl.x_max, 
                                 frame_ctrl.y_max);
     closeFile();
+
+    // Чтение оборвалось на ошибке — границы посчитаны частично. Гонять голову
+    // по такой рамке, да ещё со включённым M3, нельзя.
+    if (sd_line == SDLineResult::TooLong || sd_line == SDLineResult::ReadError) {
+        grbl_sendf(CLIENT_SERIAL, "frame aborted: %s\n", (sd_line == SDLineResult::TooLong) ? "line too long" : "read error");
+        mks_lv_label_updata(frame_page.label_text, "File error");
+        frame_ctrl.is_begin_run  = false;
+        frame_ctrl.cancle_enable = true;
+        return;
+    }
+
     mks_lv_label_updata(frame_page.label_text, "Running...");
     lv_refr_now(lv_refr_get_disp_refreshing()); 
 

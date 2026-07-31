@@ -178,7 +178,13 @@ void protocol_main_loop() {
                     grbl_notifyf("SD print failed", "%s aborted: %s (line %u)", temp, why, sd_get_current_line_number());
                     grbl_sendf(CLIENT_ALL, "SD Print Failed: %s at line %u\n", why, sd_get_current_line_number());
                     mks_grbl.carve_times = 0;
-                    closeFile();  // close file and clear SD ready/running flags
+                    if (!closeFile()) {
+                        // Файл уже невалиден (карту выдернули): closeFile() выходит
+                        // раньше и оставляет SD_ready_next взведённым, из-за чего
+                        // цикл повторял бы неудачное чтение бесконечно.
+                        set_sd_state(SDState::Idle);
+                        SD_ready_next = false;
+                    }
                 }
                 else {
                     if(mks_grbl.carve_times != 0) mks_grbl.carve_times--;
