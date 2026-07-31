@@ -332,8 +332,13 @@ namespace Motors {
     // This is used to set the stallguard window from the homing speed.
     // The percent is the offset on the window
     uint32_t TrinamicDriver::calc_tstep(float speed, float percent) {
-        float tstep =
-            speed / 60.0 * axis_settings[_axis_index]->steps_per_mm->get() * (float)(256 / axis_settings[_axis_index]->microsteps->get());
+        // microsteps == 0 означает полный шаг; без этой поправки целочисленное
+        // 256 / 0 роняет ESP32 (IntegerDivideByZero) при StallGuard-хоминге.
+        uint16_t usteps = axis_settings[_axis_index]->microsteps->get();
+        if (usteps == 0) {
+            usteps = 1;
+        }
+        float tstep = speed / 60.0 * axis_settings[_axis_index]->steps_per_mm->get() * (float)(256 / usteps);
         tstep = TRINAMIC_FCLK / tstep * percent / 100.0;
 
         return static_cast<uint32_t>(tstep);
