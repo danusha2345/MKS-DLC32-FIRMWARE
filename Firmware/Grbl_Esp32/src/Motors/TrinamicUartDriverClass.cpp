@@ -80,7 +80,14 @@ namespace Motors {
         init_step_dir_pins();  // from StandardStepper
         config_message();
 
-        tmcstepper->begin();
+        {
+            TmcBusLock lock;
+            tmcstepper->begin();
+            // Даташит TMC2209, разд. 4.1.2: на шине с несколькими слейвами
+            // SENDDELAY должен быть >= 2, иначе драйвер начинает ответ раньше,
+            // чем мастер отпустит линию. По умолчанию в TMCStepper SLAVECONF=0.
+            tmcstepper->senddelay(2);
+        }
 
         _has_errors = !test();  // Try communicating with motor. Prints an error if there is a problem.
 
@@ -196,9 +203,33 @@ namespace Motors {
             if (hold_i_percent > 1.0)
                 hold_i_percent = 1.0;
         }
+        // TMCStepper::microsteps() молча игнорирует всё, чего нет в его switch,
+        // поэтому проверяем сами: допустимы 0 (полный шаг) и степени двойки 2…256.
+        uint16_t usteps = axis_settings[_axis_index]->microsteps->get();
+        if (usteps == 1) {
+            usteps = 0;  // в grbl 1 = полный шаг, у драйвера это 0
+        }
+        bool usteps_valid = (usteps == 0) || (usteps <= 256 && (usteps & (usteps - 1)) == 0);
+        if (!usteps_valid) {
+            grbl_msg_sendf(CLIENT_SERIAL,
+                           MsgLevel::Info,
+                           "%s driver microsteps %d unsupported (use 0,2,4...256), driver unchanged",
+                           reportAxisNameMsg(_axis_index, _dual_axis_index),
+                           usteps);
+        }
+
         TmcBusLock lock;
-        tmcstepper->microsteps(axis_settings[_axis_index]->microsteps->get());
-        tmcstepper->rms_current(run_i_ma, hold_i_percent);
+        if (usteps_valid) {
+            tmcstepper->microsteps(usteps);
+        }
+        if (run_i_ma == 0) {
+            // rms_current(0) вычисляет CS = -1, которое как uint8_t становится 255
+            // и обрезается до 31 — то есть максимальный ток вместо выключенного.
+            tmcstepper->irun(0);
+            tmcstepper->ihold(0);
+        } else {
+            tmcstepper->rms_current(run_i_ma, hold_i_percent);
+        }
 
         // grbl_msg_sendf(CLIENT_SERIAL,
         //                 MsgLevel::Info,
