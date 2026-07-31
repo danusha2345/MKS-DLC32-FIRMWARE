@@ -133,11 +133,11 @@ void my_print(lv_log_level_t level, const char * file, uint32_t line, const char
 
 void mks_grbl_parg_init(void) {
 
-    if(language_select->get() == 0) mks_grbl.language = SimpleChinese;
-    else if(language_select->get() == 1) mks_grbl.language = English;
-    else if(language_select->get() == 1) mks_grbl.language = Deutsch;
-
-    set_language(1); 
+    // Строковые таблицы в прошивке только английские (см. mc_language_init),
+    // поэтому $40 ни на что не влияет. Прежний блок читал его в mks_grbl.language,
+    // тут же затирался вызовом set_language(1), а ветка Deutsch была недостижима
+    // из-за повторного условия == 1.
+    set_language(1);
     
     mks_grbl.light_status = GRBL_Light_Off;
     mks_grbl.move_dis = M_10_MM;

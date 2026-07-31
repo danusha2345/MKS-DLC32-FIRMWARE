@@ -444,12 +444,12 @@ void make_grbl_commands() {
     new GrblCommand("T", "State", showState, anyState);
     new GrblCommand("J", "Jog", doJog, idleOrJog);
 
-    new GrblCommand("$", "GrblSettings/List", report_normal_settings, notCycleOrHold);
-    new GrblCommand("+", "ExtendedSettings/List", report_extended_settings, notCycleOrHold);
-    new GrblCommand("L", "GrblNames/List", list_grbl_names, notCycleOrHold);
-    new GrblCommand("S", "Settings/List", list_settings, notCycleOrHold);
-    new GrblCommand("SC", "Settings/ListChanged", list_changed_settings, notCycleOrHold);
-    new GrblCommand("CMD", "Commands/List", list_commands, notCycleOrHold);
+    new GrblCommand("$", "GrblSettings/List", report_normal_settings, anyState);
+    new GrblCommand("+", "ExtendedSettings/List", report_extended_settings, anyState);
+    new GrblCommand("L", "GrblNames/List", list_grbl_names, anyState);
+    new GrblCommand("S", "Settings/List", list_settings, anyState);
+    new GrblCommand("SC", "Settings/ListChanged", list_changed_settings, anyState);
+    new GrblCommand("CMD", "Commands/List", list_commands, anyState);
     new GrblCommand("A", "Alarms/List", listAlarms, anyState);
     new GrblCommand("E", "Errors/List", listErrors, anyState);
     new GrblCommand("G", "GCode/Modes", report_gcode, anyState);

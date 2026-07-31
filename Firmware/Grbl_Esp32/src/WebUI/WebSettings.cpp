@@ -919,7 +919,7 @@ namespace WebUI {
         }
         SD_client = (espresponse) ? espresponse->client() : CLIENT_ALL;
         char fileLine[255];
-        while (readFileLine(fileLine, 255)) {
+        while (readFileLine(fileLine, sizeof(fileLine)) == SDLineResult::Line) {
             webPrintln(fileLine);
         }
         webPrintln("");
@@ -942,7 +942,7 @@ namespace WebUI {
             return err;
         }
         char fileLine[255];
-        if (!readFileLine(fileLine, 255)) {
+        if (readFileLine(fileLine, sizeof(fileLine)) != SDLineResult::Line) {
             //No need notification here it is just a macro
             closeFile();
             webPrintln("");
