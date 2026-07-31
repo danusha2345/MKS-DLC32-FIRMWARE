@@ -444,6 +444,10 @@ SDState write_file(const char* path, const char* message) {
 void sd_get_current_filename(char* name, size_t cap) {
     // Раньше strcpy без границ -> переполнение буфера вызывающего (char[50/60]) при
     // длинном имени/пути файла; срабатывало в т.ч. на каждый ?-статус во время печати.
+    // Лок обязателен: функция дёргается из protocol-задачи (?-статус во время задания),
+    // а тач-«Стоп» закрывает myFile из UI-задачи — без него между проверкой и
+    // myFile.name() файл успевает закрыться (use-after-free на fs::FileImpl).
+    SdFileLock _lk;
     if (myFile) {
         snprintf(name, cap, "%s", myFile.name());
     } else if (cap) {
@@ -452,6 +456,7 @@ void sd_get_current_filename(char* name, size_t cap) {
 }
 
 bool sd_file_check(const char* path) {
+    SdFileLock _lk;
 
     if(!myFile)  return false;
 

@@ -205,6 +205,25 @@ static bool checkStartupLine(char* value) {
     return gc_execute_line(value, CLIENT_SERIAL) == Error::Ok;
 }
 
+// Микрошаг: драйверы Trinamic понимают только 0 (полный шаг) и степени двойки до 256.
+// Без этой проверки $Axis/Microsteps=3 сохранялся в NVS и возвращал ok, а регистр
+// драйвера оставался прежним — настройка расходилась с железом.
+static bool checkMicrosteps(char* value) {
+    if (!value) {
+        motors_read_settings();
+        return true;
+    }
+    char*   endptr;
+    int32_t ms = strtol(value, &endptr, 10);
+    if (endptr == value || *endptr != '\0') {
+        return true;  // формат разберёт сам IntSetting
+    }
+    if (ms == 0 || ms == 1) {
+        return true;  // полный шаг
+    }
+    return ms > 0 && ms <= 256 && (ms & (ms - 1)) == 0;
+}
+
 static bool postMotorSetting(char* value) {
     if (!value) {
         motors_read_settings();
@@ -291,7 +310,7 @@ void make_settings() {
     for (axis = MAX_N_AXIS - 1; axis >= 0; axis--) {
         def          = &axis_defaults[axis];
         auto setting = new IntSetting(
-            EXTENDED, WG, makeGrblName(axis, 160), makename(def->name, "Microsteps"), def->microsteps, 0, 256, postMotorSetting);
+            EXTENDED, WG, makeGrblName(axis, 160), makename(def->name, "Microsteps"), def->microsteps, 0, 256, checkMicrosteps);
         setting->setAxis(axis);
         axis_settings[axis]->microsteps = setting;
     }
