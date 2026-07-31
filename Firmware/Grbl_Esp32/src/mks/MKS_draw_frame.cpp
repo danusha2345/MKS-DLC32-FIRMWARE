@@ -285,7 +285,7 @@ void mks_run_frame(char *parameter) {
     y1point_flag = false;
     y2point_flag = false;
 
-    while ( (readFileLine(fileLine, 255))   && 
+    while ( (readFileLine(fileLine, sizeof(fileLine)) == SDLineResult::Line)   && 
             (frame_ctrl.is_read_file)       && 
             (frame_ctrl.is_use_same_file == false)) {
         

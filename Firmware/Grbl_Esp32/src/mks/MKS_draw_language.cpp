@@ -5,11 +5,11 @@ LANGUAGE_PAGE_T language_page;
 
 void mc_language_init(void) {
 
-	if(mks_grbl.language = SimpleChinese) {
-
-		 
-	}
-	else if(mks_grbl.language = English) {
+	// В прошивке есть только английские строковые таблицы: китайская ветка была
+	// пустой, немецкой не существует. Раньше здесь стояли присваивания (= вместо ==),
+	// из-за чего выбор языка молча затирался, а таблица всё равно бралась английская.
+	// Оставлено явно: язык интерфейса фиксирован.
+	{
 		mc_language.back = BACK_EN;
 		mc_language.yes = YES_EN;
 		mc_language.no = NO_EN;
