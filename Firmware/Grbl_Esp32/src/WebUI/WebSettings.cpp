@@ -918,12 +918,22 @@ namespace WebUI {
             return err;
         }
         SD_client = (espresponse) ? espresponse->client() : CLIENT_ALL;
-        char fileLine[255];
-        while (readFileLine(fileLine, 255)) {
+        char         fileLine[255];
+        SDLineResult sd_line;
+        while ((sd_line = readFileLine(fileLine, sizeof(fileLine))) == SDLineResult::Line) {
             webPrintln(fileLine);
         }
         webPrintln("");
         closeFile();
+        // Оборванный вывод не должен выглядеть как полностью показанный файл.
+        if (sd_line == SDLineResult::TooLong) {
+            webPrintln("Line too long");
+            return Error::LineLengthExceeded;
+        }
+        if (sd_line == SDLineResult::ReadError) {
+            webPrintln("Read error");
+            return Error::FsFailedRead;
+        }
         return Error::Ok;
     }
 
@@ -941,11 +951,20 @@ namespace WebUI {
         if ((err = openSDFile(parameter)) != Error::Ok) {
             return err;
         }
-        char fileLine[255];
-        if (!readFileLine(fileLine, 255)) {
+        char         fileLine[255];
+        SDLineResult sd_line = readFileLine(fileLine, sizeof(fileLine));
+        if (sd_line != SDLineResult::Line) {
             //No need notification here it is just a macro
             closeFile();
             webPrintln("");
+            // Пустой файл — это Ok, а нечитаемая/слишком длинная первая строка
+            // означает, что задание не запущено: сообщаем об ошибке.
+            if (sd_line == SDLineResult::TooLong) {
+                return Error::LineLengthExceeded;
+            }
+            if (sd_line == SDLineResult::ReadError) {
+                return Error::FsFailedRead;
+            }
             return Error::Ok;
         }
         SD_client     = (espresponse) ? espresponse->client() : CLIENT_ALL;

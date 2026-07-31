@@ -238,6 +238,16 @@ boolean openFile(fs::FS& fs, const char* path) {
 boolean closeFile() {
     SdFileLock _lk;
     if (!myFile) {
+        // Файл уже невалиден — например, карту выдернули посреди задания. Раньше
+        // здесь был ранний return, и SD оставался в BusyPrinting: последующие
+        // операции получали Busy, а SD_ready_next продолжал требовать чтения.
+        // Состояние загрузки по HTTP не трогаем — им владеет WebServer.
+        if (get_sd_state(false) == SDState::BusyPrinting) {
+            set_sd_state(SDState::Idle);
+        }
+        SD_ready_next          = false;
+        sd_current_line_number = 0;
+        sd_total_line_number   = 0;
         return false;
     }
     set_sd_state(SDState::Idle);
@@ -275,26 +285,42 @@ boolean mks_openFile(fs::FS& fs, const char* path) {
   make uppercase
   return true if a line is
 */
-boolean readFileLine(char* line, int maxlen) {
+SDLineResult readFileLine(char* line, size_t cap) {
     SdFileLock _lk;
     if (!myFile) {
         report_status_message(Error::FsFailedRead, SD_client);
-        return false;
+        return SDLineResult::ReadError;
+    }
+    if (cap == 0) {
+        return SDLineResult::ReadError;
     }
     sd_current_line_number += 1;
-    int len = 0;
+    size_t len = 0;
     while (myFile.available()) {
-        if (len >= maxlen) {
-            return false;
+        // File::read() возвращает int и отдаёт -1 на ошибке. Если сразу привести
+        // к char, ошибка превращается в 0xFF, позиция не двигается и цикл добивает
+        // буфер мусором до ложного TooLong.
+        int ch = myFile.read();
+        if (ch < 0) {
+            line[len] = '\0';
+            return SDLineResult::ReadError;
         }
-        char c = myFile.read();
+        char c = (char)ch;
         if (c == '\n') {
-            break;
+            line[len] = '\0';
+            return SDLineResult::Line;
+        }
+        // Место под терминатор резервируется здесь, а не после цикла: раньше
+        // строка длиной ровно cap записывала '\0' за границей буфера.
+        if (len + 1 >= cap) {
+            line[cap - 1] = '\0';
+            return SDLineResult::TooLong;
         }
         line[len++] = c;
     }
     line[len] = '\0';
-    return len || myFile.available();
+    // Последняя строка без завершающего перевода строки — это тоже строка.
+    return len ? SDLineResult::Line : SDLineResult::Eof;
 }
 
 boolean readFileBuff(uint8_t *buf, uint32_t size) {

@@ -164,10 +164,22 @@ void protocol_main_loop() {
 #ifdef ENABLE_SD_CARD
         if (SD_ready_next) {
             char fileLine[255];
-                if (readFileLine(fileLine, 255)) {
+                SDLineResult sd_line = readFileLine(fileLine, sizeof(fileLine));
+                if (sd_line == SDLineResult::Line) {
                     SD_ready_next = false;
                     report_status_message(execute_line(fileLine, SD_client, SD_auth_level), SD_client);
-                } 
+                }
+                else if (sd_line != SDLineResult::Eof) {
+                    // Слишком длинная строка или ошибка чтения — задание НЕ выполнено.
+                    // Раньше это шло в общую ветку и рапортовало "SD Print Finish!".
+                    char temp[128];
+                    sd_get_current_filename(temp, sizeof(temp));
+                    const char* why = (sd_line == SDLineResult::TooLong) ? "line too long" : "read error";
+                    grbl_notifyf("SD print failed", "%s aborted: %s (line %u)", temp, why, sd_get_current_line_number());
+                    grbl_sendf(CLIENT_ALL, "SD Print Failed: %s at line %u\n", why, sd_get_current_line_number());
+                    mks_grbl.carve_times = 0;
+                    closeFile();  // снимает признаки печати даже при невалидном файле
+                }
                 else {
                     if(mks_grbl.carve_times != 0) mks_grbl.carve_times--;
 
@@ -199,7 +211,7 @@ void protocol_main_loop() {
 #ifdef ENABLE_SD_CARD
         if (SD_ready_next) {
             char fileLine[255];
-            if (readFileLine(fileLine, 255)) {
+            if (readFileLine(fileLine, sizeof(fileLine)) == SDLineResult::Line) {
                 if (is_rb_empty(&rb_sd) == true) {
                     rb_write(&rb_sd, fileLine);
                 }
@@ -223,7 +235,7 @@ void protocol_main_loop() {
                 if((sys.state == State::Cycle)) {  
                     if(is_rb_full(&rb_sd) == false) {
                         char fileLine[255];
-                        if (readFileLine(fileLine, 255)) {
+                        if (readFileLine(fileLine, sizeof(fileLine)) == SDLineResult::Line) {
                             rb_write(&rb_sd, fileLine);
                         }
                     }

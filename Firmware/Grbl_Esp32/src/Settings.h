@@ -453,7 +453,6 @@ public:
 extern bool idleOrJog();
 extern bool idleOrAlarm();
 extern bool anyState();
-extern bool notCycleOrHold();
 
 class WebCommand : public Command {
 private:
