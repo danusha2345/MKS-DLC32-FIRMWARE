@@ -222,9 +222,16 @@ namespace Motors {
         if (trinamic_current_is_off(run_i_ma)) {
             // rms_current(0) вычисляет CS = -1, которое как uint8_t становится 255
             // и обрезается до 31 — то есть максимальный ток вместо выключенного.
+            // А IRUN=0 сам по себе — не «выключено», а 1/32 шкалы тока (даташит
+            // TMC2209, IHOLD_IRUN). Настоящее отключение — TOFF=0: driver disable,
+            // all bridges off.
+            tmcstepper->toff(TRINAMIC_TOFF_DISABLE);
             tmcstepper->irun(0);
             tmcstepper->ihold(0);
         } else {
+            // Вернуть чоппер после возможного Run=0 (TOFF=0). До первого set_mode
+            // _mode == None — тогда 3, как в дефолтном CHOPCONF после begin().
+            tmcstepper->toff(_mode == TrinamicMode::StealthChop ? TRINAMIC_TOFF_STEALTHCHOP : TRINAMIC_TOFF_COOLSTEP);
             tmcstepper->rms_current(run_i_ma, hold_i_percent);
         }
 
